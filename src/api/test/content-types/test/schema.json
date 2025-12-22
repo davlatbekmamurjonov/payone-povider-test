@@ -10,15 +10,5 @@
     "draftAndPublish": true
   },
   "pluginOptions": {},
-  "attributes": {
-    "saq": {
-      "type": "customField",
-      "options": {
-        "defaultHeight": "300",
-        "description": "sasq",
-        "placeholder": "dawq"
-      },
-      "customField": "plugin::css-editor.css-editor"
-    }
-  }
+  "attributes": {}
 }

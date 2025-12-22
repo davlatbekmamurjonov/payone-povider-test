@@ -377,15 +377,6 @@ export interface ApiTestTest extends Schema.SingleType {
     createdBy: Attribute.Relation<'api::test.test', 'oneToOne', 'admin::user'> &
       Attribute.Private;
     publishedAt: Attribute.DateTime;
-    saq: Attribute.String &
-      Attribute.CustomField<
-        'plugin::css-editor.css-editor',
-        {
-          defaultHeight: '300';
-          description: 'sasq';
-          placeholder: 'dawq';
-        }
-      >;
     updatedAt: Attribute.DateTime;
     updatedBy: Attribute.Relation<'api::test.test', 'oneToOne', 'admin::user'> &
       Attribute.Private;
