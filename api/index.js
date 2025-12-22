@@ -1,4 +1,18 @@
 const { default: Strapi } = require('@strapi/strapi');
+const path = require('path');
+
+// Vercel'da node_modules path'ni to'g'rilash
+if (process.env.VERCEL) {
+  const nodeModulesPath = path.join(process.cwd(), 'node_modules');
+  if (!require.resolve.paths) {
+    require.resolve.paths = () => [nodeModulesPath];
+  }
+  if (process.env.NODE_PATH) {
+    process.env.NODE_PATH = `${nodeModulesPath}:${process.env.NODE_PATH}`;
+  } else {
+    process.env.NODE_PATH = nodeModulesPath;
+  }
+}
 
 let strapiInstance;
 
@@ -8,6 +22,7 @@ const startStrapi = async () => {
       console.log('Starting Strapi...');
       console.log('NODE_ENV:', process.env.NODE_ENV);
       console.log('Working directory:', process.cwd());
+      console.log('NODE_PATH:', process.env.NODE_PATH);
 
       strapiInstance = await Strapi({
         distDir: './dist',
