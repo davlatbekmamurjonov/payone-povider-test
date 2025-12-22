@@ -4,11 +4,19 @@ let strapiInstance;
 
 const startStrapi = async () => {
   if (!strapiInstance) {
-    strapiInstance = await Strapi({
-      distDir: './dist',
-      autoReload: false,
-      serveAdminPanel: true,
-    }).load();
+    try {
+      console.log('Starting Strapi...');
+      strapiInstance = await Strapi({
+        distDir: './dist',
+        autoReload: false,
+        serveAdminPanel: true,
+      }).load();
+      console.log('Strapi loaded successfully');
+    } catch (error) {
+      console.error('Failed to load Strapi:', error);
+      console.error('Error stack:', error.stack);
+      throw error;
+    }
   }
   return strapiInstance;
 };
@@ -16,11 +24,28 @@ const startStrapi = async () => {
 module.exports = async (req, res) => {
   try {
     const app = await startStrapi();
-    app.server.app.emit('request', req, res);
+
+    if (!app || !app.server || !app.server.app) {
+      throw new Error('Strapi app or server not initialized');
+    }
+
+    const handler = app.server.app.callback();
+
+    return handler(req, res);
+
   } catch (error) {
     console.error('Strapi server error:', error);
+    console.error('Request URL:', req.url);
+    console.error('Request method:', req.method);
+
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Internal server error', message: error.message });
+      res.status(500).json({
+        error: 'Internal server error',
+        message: error.message,
+        url: req.url,
+        method: req.method,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
     }
   }
 };
