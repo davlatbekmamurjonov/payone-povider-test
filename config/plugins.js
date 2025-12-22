@@ -3,8 +3,8 @@ module.exports = () => ({
         enabled: true,
         resolve: './src/plugins/css-editor'
     },
-    'strapi-plugin-payone-provider': {
-        enabled: true,
-        resolve: './src/plugins/strapi-plugin-payone'
-    }
+    // 'strapi-plugin-payone-provider': {
+    //     enabled: true,
+    //     resolve: './src/plugins/strapi-plugin-payone'
+    // }
 });
