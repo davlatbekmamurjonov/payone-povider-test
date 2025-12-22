@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "installCommand": "npm install",
-  "outputDirectory": "dist",
+  "builds": [
+    { "src": "server.js", "use": "@vercel/node" }
+  ],
   "routes": [
     {
       "src": "/.well-known/(.*)",
@@ -12,44 +12,8 @@
       }
     },
     {
-      "src": "/admin/(.*)",
-      "dest": "/api/index.js"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/index.js"
-    },
-    {
-      "src": "/content-manager/(.*)",
-      "dest": "/api/index.js"
-    },
-    {
-      "src": "/content-type-builder/(.*)",
-      "dest": "/api/index.js"
-    },
-    {
-      "src": "/upload/(.*)",
-      "dest": "/api/index.js"
-    },
-    {
-      "src": "/uploads/(.*)",
-      "dest": "/public/uploads/$1"
-    },
-    {
-      "src": "/_health",
-      "dest": "/api/index.js"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/api/index.js"
+      "dest": "server.js"
     }
-  ],
-  "functions": {
-    "api/index.js": {
-      "maxDuration": 30
-    }
-  },
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }
