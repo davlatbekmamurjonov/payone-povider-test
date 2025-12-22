@@ -1,4 +1,3 @@
-node_modules
 .tmp
 .strapi
 database
@@ -6,6 +5,3 @@ database
 .env.local
 *.log
 .DS_Store
-build
-dist
-
