@@ -1,4 +1,6 @@
-# Vercel'ga Strapi 4 Deploy Qilish - To'liq Qo'llanma
+# Strapi 4 ni Vercel'ga Deploy Qilish - To'liq Qo'llanma
+
+Internetdan topilgan eng yaxshi amaliyotlarga asoslangan to'liq yechim.
 
 ## QADAM 1: GitHub'ga Push Qilish
 
@@ -43,6 +45,7 @@ TRANSFER_TOKEN_SALT=your-transfer-token-salt-here
 ```
 
 **Qanday yaratish:**
+
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
@@ -50,6 +53,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ### 4.2. Database (PostgreSQL tavsiya etiladi)
 
 **Vercel Postgres yoki Supabase:**
+
 ```bash
 DATABASE_CLIENT=postgres
 DATABASE_URL=postgresql://user:pass@host:5432/dbname
@@ -57,6 +61,7 @@ DATABASE_SSL=true
 ```
 
 **Yoki boshqa database:**
+
 ```bash
 DATABASE_CLIENT=mysql
 DATABASE_HOST=your-host
@@ -78,57 +83,10 @@ SERVER_URL=https://your-project.vercel.app
 
 **Muhim:** `SERVER_URL` ni Vercel domain'ingizga o'zgartiring!
 
-### 4.4. Payone Plugin (Ixtiyoriy)
-
-```bash
-PAYONE_AID=your-aid
-PAYONE_MID=your-mid
-PAYONE_PORTAL_ID=your-portal-id
-PAYONE_PORTAL_KEY=your-key
-PAYONE_MODE=test
-```
-
-## QADAM 5: Database Configuration
-
-`config/database.js` faylini tekshiring:
-
-```javascript
-module.exports = ({ env }) => {
-  const client = env('DATABASE_CLIENT', 'postgres');
-
-  const connections = {
-    postgres: {
-      connection: {
-        connectionString: env('DATABASE_URL'),
-        host: env('DATABASE_HOST'),
-        port: env.int('DATABASE_PORT', 5432),
-        database: env('DATABASE_NAME'),
-        user: env('DATABASE_USERNAME'),
-        password: env('DATABASE_PASSWORD'),
-        ssl: env.bool('DATABASE_SSL', false) && {
-          rejectUnauthorized: false,
-        },
-      },
-      pool: {
-        min: env.int('DATABASE_POOL_MIN', 2),
-        max: env.int('DATABASE_POOL_MAX', 10),
-      },
-    },
-  };
-
-  return {
-    connection: {
-      client,
-      ...connections[client],
-      acquireConnectionTimeout: env.int('DATABASE_CONNECTION_TIMEOUT', 60000),
-    },
-  };
-};
-```
-
-## QADAM 6: Deploy Qilish
+## QADAM 5: Deploy Qilish
 
 1. **Vercel Dashboard'da:**
+
    - **Deploy** ni bosing
    - Yoki GitHub'ga push qiling (avtomatik deploy)
 
@@ -137,40 +95,35 @@ module.exports = ({ env }) => {
    - `npm run build` muvaffaqiyatli
    - `dist` papkasi yaratilgan
 
-## QADAM 7: Test Qilish
+## QADAM 6: Test Qilish
 
-### 7.1. Admin Panel
+### 6.1. Admin Panel
 
 ```
 https://your-project.vercel.app/admin
 ```
 
-### 7.2. API
+### 6.2. API
 
 ```
 https://your-project.vercel.app/api
 ```
 
-### 7.3. Health Check
+### 6.3. Health Check
 
 ```
 https://your-project.vercel.app/_health
 ```
 
-### 7.4. Well-known (Apple Pay)
-
-```
-https://your-project.vercel.app/.well-known/apple-developer-merchantid-domain-association
-```
-
-## QADAM 8: Xatolar va Yechimlar
+## QADAM 7: Xatolar va Yechimlar
 
 ### Xato: "Cannot find module '@strapi/plugin-content-manager'"
 
-**Sabab:** `node_modules` to'liq o'rnatilmagan
+**Sabab:** Plugin'lar `package.json` da `dependencies` da bo'lishi kerak
 
 **Yechim:**
-1. `.vercelignore` da `node_modules` ignore qilinmaganligini tekshiring
+
+1. `package.json` da barcha plugin'lar `dependencies` da bo'lishi kerak
 2. Build logs'da `npm install` muvaffaqiyatli bo'lganligini tekshiring
 3. Vercel'da **Redeploy** qiling
 
@@ -179,6 +132,7 @@ https://your-project.vercel.app/.well-known/apple-developer-merchantid-domain-as
 **Sabab:** Routes noto'g'ri sozlangan
 
 **Yechim:**
+
 1. `vercel.json` da routes to'g'ri sozlanganligini tekshiring
 2. `api/index.js` fayli mavjudligini tekshiring
 3. Function logs'ni tekshiring
@@ -188,67 +142,13 @@ https://your-project.vercel.app/.well-known/apple-developer-merchantid-domain-as
 **Sabab:** Database sozlamalari noto'g'ri
 
 **Yechim:**
+
 1. Environment variables to'g'ri qo'shilganligini tekshiring
 2. Database connection string to'g'ri ekanligini tekshiring
 3. Database provider'da Vercel IP'lariga ruxsat bering
-
-### Xato: "Build failed"
-
-**Sabab:** Build command yoki dependencies muammosi
-
-**Yechim:**
-1. Build logs'ni to'liq ko'rib chiqing
-2. `package.json` da build script to'g'ri ekanligini tekshiring
-3. Dependencies to'liq o'rnatilganligini tekshiring
-
-## QADAM 9: Production'ga O'tkazish
-
-### 9.1. Custom Domain
-
-1. **Vercel Dashboard > Project Settings > Domains**
-2. Custom domain qo'shing
-3. DNS sozlamalarini qo'shing
-
-### 9.2. SSL Sertifikati
-
-Vercel avtomatik SSL beradi. Qo'shimcha sozlash kerak emas.
-
-### 9.3. Environment Variables
-
-Production environment uchun alohida variable'lar sozlang.
-
-## QADAM 10: Monitoring
-
-### 10.1. Vercel Analytics
-
-Vercel Dashboard > Analytics
-
-### 10.2. Function Logs
-
-Vercel Dashboard > Deployments > Latest > Function Logs
-
-### 10.3. Build Logs
-
-Vercel Dashboard > Deployments > Latest > Build Logs
 
 ## Foydali Linklar
 
 - [Vercel Documentation](https://vercel.com/docs)
 - [Strapi Deployment Guide](https://docs.strapi.io/dev-docs/deployment)
 - [Vercel Environment Variables](https://vercel.com/docs/concepts/projects/environment-variables)
-- [Strapi on Vercel](https://docs.strapi.io/dev-docs/deployment/hosting-guides/vercel)
-
-## Xulosa
-
-✅ **To'liq deploy qo'llanmasi:**
-
-1. ✅ GitHub'ga push qiling
-2. ✅ Vercel Dashboard'da project yarating
-3. ✅ Build Settings sozlang
-4. ✅ Environment Variables qo'shing
-5. ✅ Database sozlang
-6. ✅ Deploy qiling
-7. ✅ Test qiling
-
-**Muvaffaqiyatli deploy!** 🚀
-
