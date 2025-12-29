@@ -2,7 +2,7 @@ import React from "react";
 import { Box, Flex, Typography, TextInput, Button } from "@strapi/design-system";
 import { Play } from "@strapi/icons";
 import GooglePayButton from "../GooglePaybutton";
-import ApplePayButton from "../ApplePayButton";
+import ApplePayBtn from "../ApplePayBtn";
 import CardDetailsInput from "./CardDetailsInput";
 
 const PreauthorizationForm = ({
@@ -14,7 +14,6 @@ const PreauthorizationForm = ({
   onPreauthorization,
   paymentMethod,
   settings,
-  googlePayToken,
   setGooglePayToken,
   applePayToken,
   setApplePayToken,
@@ -54,19 +53,10 @@ const PreauthorizationForm = ({
       paymentData: !!paymentData
     });
 
-    // IMPORTANT: Set token in state immediately (synchronously)
-    // This ensures the token is saved before the dialog closes
     setApplePayToken(token);
 
     console.log("[Apple Pay] Token saved to state successfully");
 
-    // Don't call onPreauthorization immediately
-    // Let the user manually trigger the payment using the button
-    // This prevents the dialog from closing prematurely if there's an error
-    // The dialog will close with success, and the user will see the "Process Preauthorization" button
-
-    // Return success immediately so the dialog closes properly
-    // The actual payment processing will happen when the user clicks the button
     return Promise.resolve({
       success: true,
       message: "Token received successfully. Please click 'Process Preauthorization' to complete the payment."
@@ -78,6 +68,8 @@ const PreauthorizationForm = ({
       onError(error);
     }
   };
+
+
   return (
     <Flex direction="column" alignItems="stretch" gap={4}>
       <Flex direction="row" gap={2}>
@@ -139,7 +131,7 @@ const PreauthorizationForm = ({
         />
       ) : paymentMethod === "apl" ? (
         <Box>
-          <ApplePayButton
+          <ApplePayBtn
             amount={paymentAmount}
             currency="EUR"
             onTokenReceived={handleApplePayToken}

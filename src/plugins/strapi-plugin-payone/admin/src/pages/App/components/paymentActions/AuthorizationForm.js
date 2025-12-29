@@ -1,8 +1,7 @@
 import React from "react";
-import { Box, Flex, Typography, TextInput, Button } from "@strapi/design-system";
+import { Box, Flex, Typography, TextInput, Button, Alert } from "@strapi/design-system";
 import { Play } from "@strapi/icons";
 import GooglePayButton from "../GooglePaybutton";
-import ApplePayButton from "../ApplePayButton";
 import CardDetailsInput from "./CardDetailsInput";
 
 const AuthorizationForm = ({
@@ -14,7 +13,6 @@ const AuthorizationForm = ({
   onAuthorization,
   paymentMethod,
   settings,
-  googlePayToken,
   setGooglePayToken,
   applePayToken,
   setApplePayToken,
@@ -54,19 +52,11 @@ const AuthorizationForm = ({
       paymentData: !!paymentData
     });
 
-    // IMPORTANT: Set token in state immediately (synchronously)
-    // This ensures the token is saved before the dialog closes
     setApplePayToken(token);
 
     console.log("[Apple Pay] Token saved to state successfully");
 
-    // Don't call onAuthorization immediately
-    // Let the user manually trigger the payment using the button
-    // This prevents the dialog from closing prematurely if there's an error
-    // The dialog will close with success, and the user will see the "Process Authorization" button
 
-    // Return success immediately so the dialog closes properly
-    // The actual payment processing will happen when the user clicks the button
     return Promise.resolve({
       success: true,
       message: "Token received successfully. Please click 'Process Authorization' to complete the payment."
@@ -141,31 +131,11 @@ const AuthorizationForm = ({
         />
       ) : paymentMethod === "apl" ? (
         <Box>
-          <ApplePayButton
-            amount={paymentAmount}
-            currency="EUR"
-            onTokenReceived={handleApplePayToken}
-            onError={handleApplePayError}
-            settings={settings}
-          />
-          {applePayToken && (
-            <Box marginTop={3} style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "8px" }}>
-              <Typography variant="pi" textColor="success600" style={{ marginBottom: "8px", fontWeight: "bold" }}>
-                ✓ Apple Pay token received. You can now process the authorization:
-              </Typography>
-              <Button
-                variant="default"
-                onClick={() => onAuthorization(applePayToken)}
-                loading={isProcessingPayment}
-                startIcon={<Play />}
-                style={{ maxWidth: '200px' }}
-                disabled={!paymentAmount.trim() || !authReference.trim() || isLiveMode}
-                className="payment-button payment-button-primary"
-              >
-                Process Authorization
-              </Button>
-            </Box>
-          )}
+          <Alert closeLabel="Close" title="Payment not supported:" variant="default">
+            <Typography variant="pi" marginTop={2}>
+              Apple pay Not supported for authorization
+            </Typography>
+          </Alert>
         </Box>
       ) : (
         <Button

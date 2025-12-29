@@ -2,17 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Box, Flex, Typography } from "@strapi/design-system";
 import { request } from "@strapi/helper-plugin";
 import pluginId from "../../../pluginId";
-import { DEFAULT_APPLE_PAY_CONFIG } from "../../utils/applePayConstants";
 
-/**
- * Apple Pay Button Component using Payment Request API
- * Based on Apple Pay documentation:
- * https://developer.apple.com/documentation/applepayontheweb/creating-an-apple-pay-session
- * https://developer.apple.com/documentation/applepayontheweb/displaying-apple-pay-buttons-using-css
- * 
- * Supports Payment Request API (works in Chrome, Edge, Safari, etc.)
- * and falls back to Apple Pay JS API if needed
- */
 const ApplePayButton = ({
   amount,
   currency = "EUR",
@@ -37,25 +27,13 @@ const ApplePayButton = ({
   const [isAvailable, setIsAvailable] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
   const buttonContainerRef = useRef(null);
-  const paymentRequestRef = useRef(null);
 
   const checkApplePayAvailability = async () => {
     try {
-      console.log("[Apple Pay] Checking availability...");
-
-      // Check secure context using browser's native property
-      // This is the most reliable way to check if we're in a secure context
       const isSecureContext = typeof window !== 'undefined' && window.isSecureContext;
       const protocol = typeof window !== 'undefined' ? window.location.protocol : '';
       const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
       const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-
-      // For Apple Pay, we need a secure context (HTTPS or localhost)
-      // window.isSecureContext is true for:
-      // - HTTPS pages
-      // - localhost (even on HTTP)
-      // - 127.0.0.1 (even on HTTP)
-      // - file:// URLs
       const isSecure = isSecureContext || isLocalhost;
 
       console.log("[Apple Pay] Secure context check:", {
@@ -67,7 +45,6 @@ const ApplePayButton = ({
         fullUrl: typeof window !== 'undefined' ? window.location.href : ''
       });
 
-      // If not secure, log detailed information
       if (!isSecure) {
         console.error("[Apple Pay] NOT in secure context!", {
           isSecureContext: isSecureContext,
@@ -79,12 +56,8 @@ const ApplePayButton = ({
         });
       }
 
-      // First, check if Payment Request API is available
-      // Payment Request API works on HTTP too, but Apple Pay JS API requires HTTPS
       if (typeof window === 'undefined' || !window.PaymentRequest) {
         console.log("[Apple Pay] Payment Request API not available");
-
-        // Fallback: Check Apple Pay JS API (for Safari, requires HTTPS)
         if (typeof window !== 'undefined' && window.ApplePaySession && isSecure) {
           try {
             const canMakePayments = ApplePaySession.canMakePayments();
@@ -106,20 +79,17 @@ const ApplePayButton = ({
 
       console.log("[Apple Pay] Payment Request API available, checking Apple Pay support...");
 
-      // Check if Apple Pay payment method is supported
       const applePayMethod = {
         supportedMethods: "https://apple.com/apple-pay",
         data: {
           version: 3,
-          merchantIdentifier: merchantIdentifier || settings?.merchantIdentifier || settings?.mid || "merchant.com.payone.test",
+          merchantIdentifier: settings?.mid,
           merchantCapabilities: merchantCapabilities,
           supportedNetworks: supportedNetworks,
           countryCode: countryCode
         }
       };
 
-      // Create a test payment request
-      // Payment Request API works on HTTP too, but Apple Pay may require HTTPS
       let testRequest;
       try {
         testRequest = new PaymentRequest(
@@ -147,7 +117,6 @@ const ApplePayButton = ({
         return { available: false, method: null };
       }
 
-      // Check if can make payment
       if (testRequest.canMakePayment) {
         try {
           const canPay = await testRequest.canMakePayment();
@@ -157,7 +126,6 @@ const ApplePayButton = ({
             return { available: true, method: 'paymentRequest' };
           }
 
-          // If PaymentRequest says no, try Apple Pay JS API as fallback (only on HTTPS)
           if (typeof window !== 'undefined' && window.ApplePaySession && isSecure) {
             try {
               const canMakePaymentsJS = ApplePaySession.canMakePayments();
@@ -165,9 +133,7 @@ const ApplePayButton = ({
               return { available: canMakePaymentsJS, method: 'applePayJS' };
             } catch (e) {
               console.error("[Apple Pay] Apple Pay JS API error:", e.message);
-              // If it's insecure context error, Payment Request API might still work
               if (e.message && e.message.includes('insecure')) {
-                // Payment Request API might work even on HTTP
                 return { available: false, method: null, error: 'insecure_context' };
               }
             }
@@ -177,7 +143,6 @@ const ApplePayButton = ({
         } catch (e) {
           console.error("[Apple Pay] Error checking canMakePayment:", e);
 
-          // If it's insecure context error, we can't use Apple Pay JS API
           if (e.message && e.message.includes('insecure')) {
             console.warn("[Apple Pay] Insecure context detected. Apple Pay requires HTTPS.");
             return { available: false, method: null, error: 'insecure_context' };
@@ -198,8 +163,6 @@ const ApplePayButton = ({
         }
       }
 
-      // If canMakePayment is not available, check secure context again
-      // Re-check secure context to ensure we have the latest state
       const isSecureContextFinal = typeof window !== 'undefined' && window.isSecureContext;
       const hostnameFinal = typeof window !== 'undefined' ? window.location.hostname : '';
       const isLocalhostFinal = hostnameFinal === 'localhost' || hostnameFinal === '127.0.0.1';
@@ -220,14 +183,11 @@ const ApplePayButton = ({
     } catch (error) {
       console.error("[Apple Pay] Error checking availability:", error);
 
-      // Check if it's insecure context error
       if (error.message && error.message.includes('insecure')) {
         console.warn("[Apple Pay] Insecure context - Apple Pay requires HTTPS");
         return { available: false, method: null, error: 'insecure_context' };
       }
 
-      // Fallback: Try Apple Pay JS API (only on HTTPS)
-      // Re-check secure context
       const isSecureContextFallback = typeof window !== 'undefined' && window.isSecureContext;
       const hostnameFallback = typeof window !== 'undefined' ? window.location.hostname : '';
       const isLocalhostFallback = hostnameFallback === 'localhost' || hostnameFallback === '127.0.0.1';
@@ -430,8 +390,8 @@ const ApplePayButton = ({
 
     try {
       const amountValue = (parseFloat(amount) / 100).toFixed(2);
-      const gatewayMerchantId = settings?.mid || settings?.portalid || '';
-      const merchantId = merchantIdentifier || gatewayMerchantId || "merchant.com.payone.test";
+      const gatewayMerchantId = settings?.mid;
+      const merchantId = gatewayMerchantId
 
       console.log("[Apple Pay] Starting payment request:", {
         amount: amountValue,
@@ -442,7 +402,6 @@ const ApplePayButton = ({
         merchantCapabilities
       });
 
-      // Define PaymentMethodData for Apple Pay
       const paymentMethodData = [{
         supportedMethods: "https://apple.com/apple-pay",
         data: {
@@ -773,7 +732,6 @@ const ApplePayButton = ({
     }
   };
 
-  // Validate merchant with Payone
   const validateMerchantWithPayone = async (validationURL, config) => {
     console.log("[Apple Pay] Validating merchant with Payone:", {
       validationURL,

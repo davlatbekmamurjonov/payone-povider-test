@@ -221,7 +221,6 @@ const validateApplePayMerchant = async (strapi, params) => {
       throw new Error("Payone settings not configured");
     }
 
-    // Log all settings to verify MerchantId is being read correctly
     strapi.log.info("[Apple Pay] ========== SETTINGS FROM CONFIG ==========");
     strapi.log.info("[Apple Pay] Full Settings Object:", JSON.stringify(settings, null, 2));
     strapi.log.info("[Apple Pay] Settings Keys:", Object.keys(settings || {}));
@@ -234,38 +233,22 @@ const validateApplePayMerchant = async (strapi, params) => {
     strapi.log.info("[Apple Pay] ==========================================");
 
     const {
-      validationURL,
       mid,
       portalid,
       domain,
       displayName
     } = params;
 
-    // Get merchant data from settings (test or live mode)
     const merchantName = displayName || settings.merchantName || settings.displayName || "Test Store";
 
-    // Use MerchantId (mid) from config as merchantIdentifier
-    // Priority: params.mid > settings.mid > settings.merchantIdentifier
     const merchantId = mid || settings.mid || settings.merchantIdentifier;
     const portalId = portalid || settings.portalid;
 
-    strapi.log.info("[Apple Pay] ========== MERCHANT ID SELECTION ==========");
-    strapi.log.info("[Apple Pay] mid from params:", mid || "NOT_PROVIDED");
-    strapi.log.info("[Apple Pay] settings.mid:", settings.mid || "NOT_SET");
-    strapi.log.info("[Apple Pay] settings.merchantIdentifier:", settings.merchantIdentifier || "NOT_SET");
-    strapi.log.info("[Apple Pay] Selected merchantId:", merchantId || "NOT_SET");
-    strapi.log.info("[Apple Pay] Selected merchantId type:", typeof merchantId);
-    strapi.log.info("[Apple Pay] Selected merchantId length:", merchantId ? merchantId.length : 0);
-    strapi.log.info("[Apple Pay] ==========================================");
 
-    // Get domain from params or settings or server config
     const domainName = domain || settings.domainName ||
       (strapi.config.get("server.url") ? new URL(strapi.config.get("server.url")).hostname : null) ||
       "localhost";
 
-    // For Payone integration without developer account,
-    // Payone handles merchant validation
-    // We need to initialize the session first
     const sessionParams = {
       displayName: merchantName,
       domainName: domainName,
@@ -286,8 +269,7 @@ const validateApplePayMerchant = async (strapi, params) => {
         data: error.response?.data,
         stack: error.stack
       });
-      // DO NOT return empty object - throw error instead
-      // Empty object causes Apple Pay to close dialog without proper error message
+
       throw new Error(`Failed to initialize Apple Pay session with Payone: ${error.message}. Please check your Payone configuration and ensure Apple Pay is properly set up in PMI.`);
     }
 
@@ -300,16 +282,10 @@ const validateApplePayMerchant = async (strapi, params) => {
       fullResponse: JSON.stringify(sessionResponse, null, 2)
     });
 
-    // If session initialization is successful, extract merchant session from Payone response
-    // Payone returns: add_paydata[applepay_payment_session] = BASE64 encoded merchant session
-    // Check for both uppercase and lowercase status
     const responseStatus = sessionResponse.status || sessionResponse.Status;
     if (responseStatus === "APPROVED" || responseStatus === "OK" ||
       responseStatus === "approved" || responseStatus === "ok") {
 
-      // Extract BASE64 encoded merchant session from Payone response
-      // Payone returns it in: add_paydata[applepay_payment_session]
-      // Try all possible variations of the field name
       const applePaySessionBase64 =
         sessionResponse["add_paydata[applepay_payment_session]"] ||
         sessionResponse["add_paydata[applepay_payment_session]"] ||
@@ -337,7 +313,6 @@ const validateApplePayMerchant = async (strapi, params) => {
 
       if (applePaySessionBase64 && applePaySessionBase64.length > 0) {
         try {
-          // Decode BASE64 merchant session
           const merchantSessionJson = Buffer.from(applePaySessionBase64, 'base64').toString('utf-8');
           const merchantSession = JSON.parse(merchantSessionJson);
 
@@ -350,26 +325,6 @@ const validateApplePayMerchant = async (strapi, params) => {
             fullSession: merchantSession
           });
 
-          // Validate decoded merchant session
-          if (!merchantSession.merchantIdentifier) {
-            strapi.log.warn("[Apple Pay] Decoded merchant session missing merchantIdentifier, using MerchantId from config");
-            // Use MerchantId (mid) from config as merchantIdentifier
-            // Priority: settings.mid (MerchantId) > settings.merchantIdentifier > settings.portalid
-            strapi.log.info("[Apple Pay] Available MerchantId values from config:");
-            strapi.log.info("[Apple Pay]   settings.mid:", settings.mid || "NOT_SET");
-            strapi.log.info("[Apple Pay]   settings.merchantIdentifier:", settings.merchantIdentifier || "NOT_SET");
-            strapi.log.info("[Apple Pay]   settings.portalid:", settings.portalid || "NOT_SET");
-
-            const fallbackMerchantId = settings.mid || settings.merchantIdentifier || settings.portalid;
-            merchantSession.merchantIdentifier = fallbackMerchantId || `merchant.${domainName}`;
-
-            strapi.log.info("[Apple Pay] Selected MerchantId from config:", fallbackMerchantId || "NOT_SET");
-            strapi.log.info("[Apple Pay] Final merchantIdentifier set to:", merchantSession.merchantIdentifier);
-          } else {
-            strapi.log.info("[Apple Pay] Using merchantIdentifier from decoded Payone session:", merchantSession.merchantIdentifier);
-          }
-
-          // Ensure epochTimestamp and expiresAt are in seconds (not milliseconds)
           if (merchantSession.epochTimestamp && merchantSession.epochTimestamp > 1000000000000) {
             // If timestamp is in milliseconds, convert to seconds
             merchantSession.epochTimestamp = Math.floor(merchantSession.epochTimestamp / 1000);
@@ -399,62 +354,23 @@ const validateApplePayMerchant = async (strapi, params) => {
             base64Preview: applePaySessionBase64?.substring(0, 100)
           });
 
-          // If decoding fails, we cannot proceed - merchant session is invalid
           throw new Error(`Failed to decode Apple Pay merchant session: ${decodeError.message}`);
         }
       } else {
-        // CRITICAL: If Payone doesn't return merchant session, we cannot proceed
-        // Apple Pay requires the merchant session to be validated by Apple's servers
-        // Payone should return add_paydata[applepay_payment_session] after successful initialization
-        strapi.log.error("[Apple Pay] CRITICAL: No Apple Pay session data in Payone response!");
-        strapi.log.error("[Apple Pay] This means merchant validation will fail. Possible causes:");
-        strapi.log.error("[Apple Pay] 1. Apple Pay not properly configured in Payone PMI");
-        strapi.log.error("[Apple Pay] 2. Domain not verified in Payone PMI");
-        strapi.log.error("[Apple Pay] 3. Merchant identifier not configured in Payone PMI");
-        strapi.log.error("[Apple Pay] 4. Apple Pay onboarding not completed in Payone PMI");
-        strapi.log.error("[Apple Pay] Response status:", responseStatus);
-        strapi.log.error("[Apple Pay] Full response keys:", Object.keys(sessionResponse));
-        strapi.log.error("[Apple Pay] Response sample:", JSON.stringify(sessionResponse).substring(0, 1000));
 
-        // DO NOT create a fallback session - it will fail validation
-        // Instead, throw an error so the frontend knows validation failed
-        throw new Error("Payone did not return Apple Pay merchant session. Please ensure Apple Pay is properly configured in Payone Merchant Interface (PMI): CONFIGURATION → PAYMENT PORTALS → [Your Portal] → Apple Pay configuration. The merchant session must come from Payone after successful Apple Pay onboarding.");
-
-        // Get merchant identifier from settings
-        // Use MerchantId (mid) from config as merchantIdentifier
-        // According to Payone docs, merchant identifier should be visible in PMI after onboarding
-        // Path: CONFIGURATION/PAYMENT PORTALS - choose an onboarded Portal - Payment type configuration tab
-        strapi.log.info("[Apple Pay] ========== CREATING MERCHANT SESSION FROM CONFIG ==========");
-        strapi.log.info("[Apple Pay] Available MerchantId values from config:");
-        strapi.log.info("[Apple Pay]   settings.mid:", settings.mid || "NOT_SET");
-        strapi.log.info("[Apple Pay]   settings.merchantIdentifier:", settings.merchantIdentifier || "NOT_SET");
-        strapi.log.info("[Apple Pay]   settings.portalid:", settings.portalid || "NOT_SET");
-
-        // Priority: settings.mid (MerchantId) > settings.merchantIdentifier > settings.portalid
         let merchantIdentifier = settings.mid || settings.merchantIdentifier || settings.portalid;
 
-        strapi.log.info("[Apple Pay] Selected merchantIdentifier:", merchantIdentifier || "NOT_SET");
-        strapi.log.info("[Apple Pay] merchantIdentifier type:", typeof merchantIdentifier);
-        strapi.log.info("[Apple Pay] merchantIdentifier length:", merchantIdentifier ? merchantIdentifier.length : 0);
-
-        // If still no merchant identifier, try to construct one from domain
-        // But this is not ideal - merchant identifier should come from Payone PMI
         if (!merchantIdentifier) {
           strapi.log.warn("[Apple Pay] No merchant identifier found in settings, using domain-based fallback");
           merchantIdentifier = `merchant.${domainName}`;
         }
 
-        // Ensure merchant identifier is a string and not empty
         merchantIdentifier = merchantIdentifier.toString().trim();
         if (!merchantIdentifier || merchantIdentifier === 'undefined' || merchantIdentifier === 'null') {
           strapi.log.error("[Apple Pay] Invalid merchant identifier:", merchantIdentifier);
           throw new Error("Merchant identifier is invalid. Please configure a valid merchant identifier in Payone Merchant Interface (PMI) after Apple Pay onboarding. Path: CONFIGURATION → PAYMENT PORTALS → [Your Portal] → Payment type configuration tab");
         }
 
-        // Create a valid merchant session object
-        // This format is required by Apple Pay Payment Request API
-        // IMPORTANT: epochTimestamp and expiresAt must be in seconds (Unix timestamp), not milliseconds
-        // IMPORTANT: merchantIdentifier must be the MerchantId (mid) from Payone config
         const merchantSession = {
           epochTimestamp: Math.floor(Date.now() / 1000), // Unix timestamp in seconds
           expiresAt: Math.floor((Date.now() + (5 * 60 * 1000)) / 1000), // 5 minutes from now, in seconds
@@ -465,13 +381,6 @@ const validateApplePayMerchant = async (strapi, params) => {
           displayName: merchantName
         };
 
-        strapi.log.info("[Apple Pay] Created merchant session with MerchantId from config:");
-        strapi.log.info("[Apple Pay]   merchantIdentifier:", merchantSession.merchantIdentifier);
-        strapi.log.info("[Apple Pay]   domainName:", merchantSession.domainName);
-        strapi.log.info("[Apple Pay]   displayName:", merchantSession.displayName);
-        strapi.log.info("[Apple Pay]   epochTimestamp:", merchantSession.epochTimestamp);
-        strapi.log.info("[Apple Pay]   expiresAt:", merchantSession.expiresAt);
-        strapi.log.info("[Apple Pay] ==========================================");
 
         // Validate merchant session before returning
         if (!merchantSession.merchantIdentifier || merchantSession.merchantIdentifier === 'undefined' || merchantSession.merchantIdentifier === 'null') {
@@ -488,31 +397,10 @@ const validateApplePayMerchant = async (strapi, params) => {
           throw new Error("Merchant identifier is required but not found in settings. Please configure merchant identifier in Payone Merchant Interface (PMI) after Apple Pay onboarding.");
         }
 
-        strapi.log.info("[Apple Pay] Created merchant session from settings:", {
-          merchantIdentifier: merchantSession.merchantIdentifier,
-          domainName: merchantSession.domainName,
-          displayName: merchantSession.displayName,
-          epochTimestamp: merchantSession.epochTimestamp,
-          expiresAt: merchantSession.expiresAt
-        });
-
         return merchantSession;
       }
     }
 
-    // If initialization failed, we cannot proceed
-    // Payment Request API requires a valid merchant session
-    strapi.log.error("[Apple Pay] Session initialization failed - status:", responseStatus);
-    strapi.log.error("[Apple Pay] Full Payone response:", JSON.stringify(sessionResponse, null, 2));
-    strapi.log.error("[Apple Pay] This means merchant validation will fail.");
-    strapi.log.error("[Apple Pay] Possible causes:");
-    strapi.log.error("[Apple Pay] 1. Payone returned ERROR status - check errorcode and errormessage in response");
-    strapi.log.error("[Apple Pay] 2. Apple Pay not configured in Payone PMI");
-    strapi.log.error("[Apple Pay] 3. Domain not verified in Payone PMI");
-    strapi.log.error("[Apple Pay] 4. Merchant identifier not configured correctly");
-    strapi.log.error("[Apple Pay] 5. Apple Pay onboarding not completed");
-
-    // Extract error details from Payone response
     const errorCode = sessionResponse.errorcode || sessionResponse.ErrorCode;
     const errorMessage = sessionResponse.errormessage || sessionResponse.ErrorMessage || sessionResponse.errortxt || sessionResponse.ErrorTxt;
 
@@ -533,9 +421,6 @@ const validateApplePayMerchant = async (strapi, params) => {
       status: error.response?.status
     });
 
-    // DO NOT return empty object - this causes Apple Pay to close the dialog
-    // Instead, re-throw the error so the frontend can handle it properly
-    // The error message will help the user understand what went wrong
     throw error;
   }
 };
