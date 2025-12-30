@@ -42,13 +42,13 @@ const PaymentMethodSelector = ({
               </Typography>
               <Box marginTop={2} padding={2} background="neutral100" borderRadius="4px">
                 <Typography variant="pi" style={{ fontFamily: "monospace", fontSize: "12px" }}>
-                  'script-src': ['https://applepay.cdn-apple.com', 'https://www.apple.com']<br/>
-                  'connect-src': ['https://applepay.cdn-apple.com', 'https://www.apple.com']<br/>
+                  'script-src': ['https://applepay.cdn-apple.com', 'https://www.apple.com']<br />
+                  'connect-src': ['https://applepay.cdn-apple.com', 'https://www.apple.com']<br />
                   'frame-src': ['https://applepay.cdn-apple.com']
                 </Typography>
               </Box>
               <Typography variant="pi" marginTop={2} fontWeight="bold">
-                ⚠️ Without this configuration, Apple Pay will NOT work!
+                Without this configuration, Apple Pay will NOT work!
               </Typography>
             </Alert>
             <Alert closeLabel="Close" title="📥 Apple Pay Domain Verification File Required" variant="default">
@@ -57,7 +57,7 @@ const PaymentMethodSelector = ({
               </Typography>
               <Box marginTop={2} padding={2} background="neutral100" borderRadius="4px">
                 <Typography variant="pi" style={{ fontFamily: "monospace", fontSize: "12px" }}>
-                  <strong>Strapi:</strong> <code>public/.well-known/apple-developer-merchantid-domain-association</code><br/>
+                  <strong>Strapi:</strong> <code>public/.well-known/apple-developer-merchantid-domain-association</code><br />
                   <strong>Frontend:</strong> <code>public/.well-known/apple-developer-merchantid-domain-association</code>
                 </Typography>
               </Box>
@@ -72,11 +72,9 @@ const PaymentMethodSelector = ({
                   https://docs.payone.com/payment-methods/apple-pay/apple-pay-without-dev
                 </Link>
               </Typography>
-              <Typography variant="pi" marginTop={2}>
-                <strong>Alternative:</strong> Log into your Payone Merchant Interface (PMI) → Configuration → Payment Portals → Apple Pay → Download domain verification file
-              </Typography>
+              <br />
               <Typography variant="pi" marginTop={2} fontWeight="bold" textColor="danger600">
-                ⚠️ Without this file, Apple Pay will NOT work on your domain!
+                Without this file, Apple Pay will NOT work on your domain!
               </Typography>
             </Alert>
             <Box padding={3} background="neutral100" borderRadius="4px">
@@ -107,8 +105,8 @@ const PaymentMethodSelector = ({
               </Typography>
               <Box marginTop={2} padding={2} background="neutral100" borderRadius="4px">
                 <Typography variant="pi" style={{ fontFamily: "monospace", fontSize: "12px" }}>
-                  'script-src': ['https://pay.google.com']<br/>
-                  'connect-src': ['https://pay.google.com']<br/>
+                  'script-src': ['https://pay.google.com']<br />
+                  'connect-src': ['https://pay.google.com']<br />
                   'frame-src': ['https://pay.google.com']
                 </Typography>
               </Box>

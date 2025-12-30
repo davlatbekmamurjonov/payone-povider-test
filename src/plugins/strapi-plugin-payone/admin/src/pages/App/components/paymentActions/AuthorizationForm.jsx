@@ -1,17 +1,23 @@
 import React from "react";
-import { Box, Flex, Typography, TextInput, Button } from "@strapi/design-system";
+import {
+  Box,
+  Flex,
+  Typography,
+  TextInput,
+  Button,
+} from "@strapi/design-system";
 import { Play } from "@strapi/icons";
 import GooglePayButton from "../GooglePaybutton";
 import ApplePayBtn from "../ApplePayBtn";
 import CardDetailsInput from "./CardDetailsInput";
 
-const PreauthorizationForm = ({
+const AuthorizationForm = ({
   paymentAmount,
   setPaymentAmount,
-  preauthReference,
-  setPreauthReference,
+  authReference,
+  setAuthReference,
   isProcessingPayment,
-  onPreauthorization,
+  onAuthorization,
   paymentMethod,
   settings,
   setGooglePayToken,
@@ -25,14 +31,14 @@ const PreauthorizationForm = ({
   setCardexpiredate,
   cardcvc2,
   setCardcvc2,
-  isLiveMode = false
+  isLiveMode = false,
 }) => {
   const handleGooglePayToken = (token, paymentData) => {
     if (!token) {
       return;
     }
     setGooglePayToken(token);
-    onPreauthorization(token);
+    onAuthorization(token);
   };
 
   const handleGooglePayError = (error) => {
@@ -43,23 +49,15 @@ const PreauthorizationForm = ({
 
   const handleApplePayToken = async (token, paymentData) => {
     if (!token) {
-      console.error("[Apple Pay] Token is missing in handleApplePayToken");
       return Promise.reject(new Error("Token is missing"));
     }
 
-    console.log("[Apple Pay] handleApplePayToken called with token:", {
-      hasToken: !!token,
-      tokenLength: token?.length,
-      paymentData: !!paymentData
-    });
-
     setApplePayToken(token);
-
-    console.log("[Apple Pay] Token saved to state successfully");
 
     return Promise.resolve({
       success: true,
-      message: "Token received successfully. Please click 'Process Preauthorization' to complete the payment."
+      message:
+        "Token received successfully. Please click 'Process Authorization' to complete the payment.",
     });
   };
 
@@ -69,22 +67,30 @@ const PreauthorizationForm = ({
     }
   };
 
-
   return (
     <Flex direction="column" alignItems="stretch" gap={4}>
       <Flex direction="row" gap={2}>
-        <Typography variant="omega" fontWeight="semiBold" textColor="neutral800" className="payment-form-title">
-          Preauthorization
+        <Typography
+          variant="omega"
+          fontWeight="semiBold"
+          textColor="neutral800"
+          className="payment-form-title"
+        >
+          Authorization
         </Typography>
-        <Typography variant="pi" textColor="neutral600" className="payment-form-description">
-          Reserve an amount on a credit card without capturing it immediately.
+        <Typography
+          variant="pi"
+          textColor="neutral600"
+          className="payment-form-description"
+        >
+          Authorize and capture an amount immediately.
         </Typography>
       </Flex>
 
       <Flex gap={4} wrap="wrap">
         <TextInput
           label="Amount (in cents) *"
-          name="paymentAmount"
+          name="authAmount"
           value={paymentAmount}
           onChange={(e) => setPaymentAmount(e.target.value)}
           placeholder="Enter amount (e.g., 1000 for €10.00)"
@@ -96,9 +102,9 @@ const PreauthorizationForm = ({
 
         <TextInput
           label="Reference *"
-          name="preauthReference"
-          value={preauthReference}
-          onChange={(e) => setPreauthReference(e.target.value)}
+          name="authReference"
+          value={authReference}
+          onChange={(e) => setAuthReference(e.target.value)}
           placeholder="Auto-generated if empty"
           hint="Reference will be auto-generated if left empty"
           className="payment-input"
@@ -133,59 +139,67 @@ const PreauthorizationForm = ({
         <Box>
           <ApplePayBtn
             amount={paymentAmount}
-            currency="EUR"
             onTokenReceived={handleApplePayToken}
             onError={handleApplePayError}
             settings={settings}
           />
           {applePayToken && (
-            <Box marginTop={3} style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "8px" }}>
-              <Typography variant="pi" textColor="success600" style={{ marginBottom: "8px", fontWeight: "bold" }}>
-                ✓ Apple Pay token received. You can now process the preauthorization:
+            <Box
+              marginTop={3}
+              style={{
+                width: "100%",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-start",
+                gap: "8px",
+              }}
+            >
+              <Typography
+                variant="pi"
+                textColor="success600"
+                style={{ marginBottom: "8px", fontWeight: "bold" }}
+              >
+                ✓ Apple Pay token received. You can now process the
+                authorization:
               </Typography>
               <Button
                 variant="default"
-                onClick={() => onPreauthorization(applePayToken)}
+                onClick={() => onAuthorization(applePayToken)}
                 loading={isProcessingPayment}
                 startIcon={<Play />}
-                style={{ maxWidth: '200px' }}
-                disabled={!paymentAmount.trim() || !preauthReference.trim() || isLiveMode}
+                style={{ maxWidth: "200px" }}
+                disabled={
+                  !paymentAmount.trim() || !authReference.trim() || isLiveMode
+                }
                 className="payment-button payment-button-primary"
               >
-                Process Preauthorization
+                Process Authorization
               </Button>
-            </Box>
-          )}
-          {!applePayToken && (
-            <Box marginTop={3} style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "8px" }}>
-              <Typography variant="pi" textColor="neutral600" style={{ marginBottom: "8px" }}>
-                Apple Pay is not available on localhost. You can test the payment flow without Apple Pay token:
-              </Typography>
             </Box>
           )}
         </Box>
       ) : (
         <Button
           variant="default"
-          onClick={onPreauthorization}
+          onClick={onAuthorization}
           loading={isProcessingPayment}
           startIcon={<Play />}
-          style={{ maxWidth: '200px' }}
+          style={{ maxWidth: "200px" }}
           className="payment-button payment-button-primary"
           disabled={
             !paymentAmount.trim() ||
             (paymentMethod === "cc" &&
               settings?.enable3DSecure !== false &&
               (!cardtype || !cardpan || !cardexpiredate || !cardcvc2)) ||
+            (paymentMethod === "apl" && !applePayToken) ||
             isLiveMode
           }
         >
-          Process Preauthorization
+          Process Authorization
         </Button>
       )}
     </Flex>
   );
 };
 
-export default PreauthorizationForm;
-
+export default AuthorizationForm;

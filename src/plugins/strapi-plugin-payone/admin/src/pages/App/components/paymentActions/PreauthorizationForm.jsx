@@ -1,21 +1,19 @@
 import React from "react";
-import { Box, Flex, Typography, TextInput, Button, Alert } from "@strapi/design-system";
+import { Box, Flex, Typography, TextInput, Button } from "@strapi/design-system";
 import { Play } from "@strapi/icons";
 import GooglePayButton from "../GooglePaybutton";
 import CardDetailsInput from "./CardDetailsInput";
 
-const AuthorizationForm = ({
+const PreauthorizationForm = ({
   paymentAmount,
   setPaymentAmount,
-  authReference,
-  setAuthReference,
+  preauthReference,
+  setPreauthReference,
   isProcessingPayment,
-  onAuthorization,
+  onPreauthorization,
   paymentMethod,
   settings,
   setGooglePayToken,
-  applePayToken,
-  setApplePayToken,
   cardtype,
   setCardtype,
   cardpan,
@@ -31,7 +29,7 @@ const AuthorizationForm = ({
       return;
     }
     setGooglePayToken(token);
-    onAuthorization(token);
+    onPreauthorization(token);
   };
 
   const handleGooglePayError = (error) => {
@@ -40,51 +38,23 @@ const AuthorizationForm = ({
     }
   };
 
-  const handleApplePayToken = async (token, paymentData) => {
-    if (!token) {
-      console.error("[Apple Pay] Token is missing in handleApplePayToken");
-      return Promise.reject(new Error("Token is missing"));
-    }
-
-    console.log("[Apple Pay] handleApplePayToken called with token:", {
-      hasToken: !!token,
-      tokenLength: token?.length,
-      paymentData: !!paymentData
-    });
-
-    setApplePayToken(token);
-
-    console.log("[Apple Pay] Token saved to state successfully");
-
-
-    return Promise.resolve({
-      success: true,
-      message: "Token received successfully. Please click 'Process Authorization' to complete the payment."
-    });
-  };
-
-  const handleApplePayError = (error) => {
-    if (onError) {
-      onError(error);
-    }
-  };
 
 
   return (
     <Flex direction="column" alignItems="stretch" gap={4}>
       <Flex direction="row" gap={2}>
         <Typography variant="omega" fontWeight="semiBold" textColor="neutral800" className="payment-form-title">
-          Authorization
+          Preauthorization
         </Typography>
         <Typography variant="pi" textColor="neutral600" className="payment-form-description">
-          Authorize and capture an amount immediately.
+          Reserve an amount on a credit card without capturing it immediately.
         </Typography>
       </Flex>
 
       <Flex gap={4} wrap="wrap">
         <TextInput
           label="Amount (in cents) *"
-          name="authAmount"
+          name="paymentAmount"
           value={paymentAmount}
           onChange={(e) => setPaymentAmount(e.target.value)}
           placeholder="Enter amount (e.g., 1000 for €10.00)"
@@ -96,9 +66,9 @@ const AuthorizationForm = ({
 
         <TextInput
           label="Reference *"
-          name="authReference"
-          value={authReference}
-          onChange={(e) => setAuthReference(e.target.value)}
+          name="preauthReference"
+          value={preauthReference}
+          onChange={(e) => setPreauthReference(e.target.value)}
           placeholder="Auto-generated if empty"
           hint="Reference will be auto-generated if left empty"
           className="payment-input"
@@ -131,16 +101,14 @@ const AuthorizationForm = ({
         />
       ) : paymentMethod === "apl" ? (
         <Box>
-          <Alert closeLabel="Close" title="Payment not supported:" variant="default">
-            <Typography variant="pi" marginTop={2}>
-              Apple pay Not supported for authorization
-            </Typography>
-          </Alert>
+          <Typography variant="pi" textColor="neutral600">
+            Apple Pay is only supported for Authorization, not Preauthorization.
+          </Typography>
         </Box>
       ) : (
         <Button
           variant="default"
-          onClick={onAuthorization}
+          onClick={onPreauthorization}
           loading={isProcessingPayment}
           startIcon={<Play />}
           style={{ maxWidth: '200px' }}
@@ -150,16 +118,15 @@ const AuthorizationForm = ({
             (paymentMethod === "cc" &&
               settings?.enable3DSecure !== false &&
               (!cardtype || !cardpan || !cardexpiredate || !cardcvc2)) ||
-            (paymentMethod === "apl" && !applePayToken) ||
             isLiveMode
           }
         >
-          Process Authorization
+          Process Preauthorization
         </Button>
       )}
     </Flex>
   );
 };
 
-export default AuthorizationForm;
+export default PreauthorizationForm;
 
