@@ -6,12 +6,10 @@ const getPayoneService = (strapi) => {
   return strapi.plugin(PLUGIN_NAME).service("payone");
 };
 
-
 const handleError = (ctx, error) => {
   ctx.strapi.log.error("Payone controller error:", error);
   ctx.throw(500, error);
 };
-
 
 const hideKey = (settings) => {
   if (settings && settings.key) {

@@ -1,7 +1,18 @@
 "use strict";
 
+<<<<<<< HEAD
+const { getPluginStore, PLUGIN_NAME } = require("./settingsService");
+
+/**
+ * Log transaction to history
+ * @param {Object} strapi - Strapi instance
+ * @param {Object} transactionData - Transaction data
+ * @returns {Promise<void>}
+ */
+=======
 const { getPluginStore } = require("./settingsService");
 
+>>>>>>> feature/apple-pay
 const logTransaction = async (strapi, transactionData) => {
   const pluginStore = getPluginStore(strapi);
   let transactionHistory =
@@ -35,6 +46,10 @@ const logTransaction = async (strapi, transactionData) => {
 
   transactionHistory.unshift(logEntry);
 
+<<<<<<< HEAD
+  // Keep only last 1000 transactions
+=======
+>>>>>>> feature/apple-pay
   if (transactionHistory.length > 1000) {
     transactionHistory = transactionHistory.slice(0, 1000);
   }
@@ -47,11 +62,24 @@ const logTransaction = async (strapi, transactionData) => {
   strapi.log.info("Transaction logged:", logEntry);
 };
 
+<<<<<<< HEAD
+/**
+ * Get transaction history with filters
+ * @param {Object} strapi - Strapi instance
+ * @param {Object} filters - Filter options
+ * @returns {Promise<Array>} Filtered transaction history
+ */
+=======
+>>>>>>> feature/apple-pay
 const getTransactionHistory = async (strapi, filters = {}) => {
   const pluginStore = getPluginStore(strapi);
   let transactionHistory =
     (await pluginStore.get({ key: "transactionHistory" })) || [];
 
+<<<<<<< HEAD
+  // Apply filters
+=======
+>>>>>>> feature/apple-pay
   if (filters.status) {
     transactionHistory = transactionHistory.filter(
       (transaction) => transaction.status === filters.status

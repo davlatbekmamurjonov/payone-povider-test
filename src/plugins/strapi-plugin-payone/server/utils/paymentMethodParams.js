@@ -1,11 +1,6 @@
 "use strict";
 
-/**
- * Add payment method specific parameters
- * @param {Object} params - Request parameters
- * @param {Object} logger - Logger instance
- * @returns {Object} Updated parameters with payment method defaults
- */
+
 const addPaymentMethodParams = (params, logger) => {
   const updated = { ...params };
   const clearingtype = updated.clearingtype || "cc";
@@ -152,7 +147,6 @@ const addPaymentMethodParams = (params, logger) => {
       updated.wallettype = "PPE";
     }
   }
-
   if (updated.clearingtype === "wlt" && updated.cardtype) {
     delete updated.cardtype;
   }
