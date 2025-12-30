@@ -224,6 +224,9 @@ const ApplePayBtn = ({
     session.begin();
   };
 
+  const mode = (settings?.mode || 'test').toLowerCase();
+  const isLiveMode = mode === 'live';
+
   if (!settings?.mid) {
     return (
       <Box>
@@ -233,6 +236,24 @@ const ApplePayBtn = ({
             settings. You can find your merchantIdentifier in PMI at:
             CONFIGURATION → PAYMENT PORTALS → [Your Portal] → Payment type
             configuration tab.
+          </Typography>
+        </Alert>
+      </Box>
+    );
+  }
+
+  if (!isLiveMode) {
+    return (
+      <Box>
+        <Alert closeLabel="Close" title="⚠️ Apple Pay Only Works in Live Mode" variant="danger">
+          <Typography variant="pi" marginTop={2}>
+            <strong>Apple Pay is only supported in live mode.</strong> According to Payone documentation, test mode support will be available at a later time.
+          </Typography>
+          <Typography variant="pi" marginTop={2}>
+            Please switch to <strong>live mode</strong> in plugin settings to use Apple Pay.
+          </Typography>
+          <Typography variant="pi" marginTop={2} fontWeight="bold" textColor="danger600">
+            ⚠️ Apple Pay will NOT work in test mode!
           </Typography>
         </Alert>
       </Box>
