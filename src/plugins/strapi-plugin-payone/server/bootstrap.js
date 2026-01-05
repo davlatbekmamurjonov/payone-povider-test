@@ -58,12 +58,10 @@ module.exports = async ({ strapi }) => {
       try {
         const publicPath = path.join(process.cwd(), 'public');
         const wellKnownPath = path.join(publicPath, '.well-known');
-
-        // Check multiple possible file locations (in order of preference)
         const possiblePaths = [
-          path.join(wellKnownPath, 'apple-developer-merchantid-domain-association'), // Correct: no extension
-          path.join(wellKnownPath, 'apple-developer-merchantid-domain-association.txt'), // User's file with .txt
-          path.join(wellKnownPath, 'apple-developer-merchant-id-domain-association.txt'), // Alternative format
+          path.join(wellKnownPath, 'apple-developer-merchantid-domain-association'),
+          path.join(wellKnownPath, 'apple-developer-merchantid-domain-association.txt'),
+          path.join(wellKnownPath, 'apple-developer-merchant-id-domain-association.txt'),
         ];
 
         let fileContent = null;
@@ -79,11 +77,10 @@ module.exports = async ({ strapi }) => {
         }
 
         if (fileContent) {
-          // Set proper content type and headers for Apple Pay domain verification
           ctx.type = 'text/plain';
           ctx.set('Content-Type', 'text/plain');
-          ctx.set('Cache-Control', 'public, max-age=31536000'); // Cache for 1 year as per Apple guidelines
-          ctx.body = fileContent.trim(); // Remove any trailing whitespace
+          ctx.set('Cache-Control', 'public, max-age=31536000');
+          ctx.body = fileContent.trim();
           strapi.log.info(`[Apple Pay] Successfully served domain verification file from: ${filePathFound}`);
         } else {
           strapi.log.warn(`[Apple Pay] Domain verification file not found. Searched paths:`, possiblePaths);

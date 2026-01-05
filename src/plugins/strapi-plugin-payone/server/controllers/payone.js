@@ -224,20 +224,38 @@ module.exports = ({ strapi }) => ({
 
       ctx.body = { data: result };
     } catch (error) {
+      const errorStatus = error.status || (error.message?.includes('403') ? 403 : 500);
+      
       strapi.log.error("[Apple Pay] Controller error:", {
         message: error.message,
         stack: error.stack,
         name: error.name,
-        requestBody: ctx.request.body
+        status: errorStatus,
+        requestBody: ctx.request.body,
+        errorType: error.constructor?.name
       });
 
-      ctx.status = error.status || 500;
+      // Extract detailed error message if available
+      let errorMessage = error.message || "Apple Pay merchant validation failed";
+      let errorDetails = "Please check your Payone Apple Pay configuration in PMI (CONFIGURATION → PAYMENT PORTALS → [Your Portal] → Apple Pay). Ensure that Merchant ID (mid) is correctly configured and Apple Pay is enabled for your portal.";
+      
+      // If it's a 403 error, provide more specific guidance
+      if (errorStatus === 403 || error.message?.includes('403')) {
+        errorDetails = "403 Forbidden: Authentication failed with Payone. " +
+          "Please check: 1) Your Payone credentials (aid, portalid, mid, key) in plugin settings, " +
+          "2) Mode is set to 'live' (Apple Pay only works in live mode), " +
+          "3) Your domain is registered with Payone Merchant Services, " +
+          "4) Merchant ID (mid) matches your merchantIdentifier in PMI, " +
+          "5) Apple Pay is enabled for your portal in PMI.";
+      }
+
+      ctx.status = errorStatus;
       ctx.body = {
         error: {
-          status: error.status || 500,
+          status: errorStatus,
           name: error.name || "Error",
-          message: error.message || "Apple Pay merchant validation failed",
-          details: "Please check your Payone Apple Pay configuration in PMI (CONFIGURATION → PAYMENT PORTALS → [Your Portal] → Apple Pay). Ensure that Merchant ID (mid) is correctly configured and Apple Pay is enabled for your portal."
+          message: errorMessage,
+          details: errorDetails
         }
       };
     }
