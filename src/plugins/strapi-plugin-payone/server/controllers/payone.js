@@ -160,24 +160,84 @@ module.exports = ({ strapi }) => ({
 
   async validateApplePayMerchant(ctx) {
     try {
-      strapi.log.info("[Apple Pay] Request body:", JSON.stringify(ctx.request.body, null, 2));
+      // Get settings to access Apple Pay config
+      const settings = await getPayoneService(strapi).getSettings();
+      const applePayConfig = settings?.applePayConfig || {};
+
+      strapi.log.info("[Apple Pay] Request received:", {
+        body: ctx.request.body,
+        domain: ctx.request.body?.domain || ctx.request.body?.domainName,
+        displayName: ctx.request.body?.displayName,
+        currency: ctx.request.body?.currency,
+        applePayConfig: {
+          currencyCode: applePayConfig.currencyCode,
+          countryCode: applePayConfig.countryCode
+        }
+      });
 
       const params = ctx.request.body;
+
+      if (!params) {
+        throw new Error("Request body is missing");
+      }
+
+      // Ensure domain is set
+      if (!params.domain && !params.domainName) {
+        params.domain = ctx.request.hostname || ctx.request.host || 'localhost';
+        params.domainName = params.domain;
+      } else if (params.domain && !params.domainName) {
+        params.domainName = params.domain;
+      } else if (params.domainName && !params.domain) {
+        params.domain = params.domainName;
+      }
+
+      if (!params.displayName) {
+        params.displayName = settings?.merchantName || "Store";
+      }
+
+      // Get currency and country from Apple Pay config if not provided
+      if (!params.currency) {
+        params.currency = applePayConfig.currencyCode || "EUR";
+      }
+      if (!params.countryCode) {
+        params.countryCode = applePayConfig.countryCode || "DE";
+      }
+
+      strapi.log.info("[Apple Pay] Using params:", {
+        domain: params.domain,
+        displayName: params.displayName,
+        currency: params.currency,
+        countryCode: params.countryCode
+      });
+
       let result = await getPayoneService(strapi).validateApplePayMerchant(params);
-      strapi.log.info("[Apple Pay] Merchant validation result:", JSON.stringify(result, null, 2));
+
+      if (!result) {
+        throw new Error("Merchant validation returned null. Please check your Payone Apple Pay configuration.");
+      }
+
+      strapi.log.info("[Apple Pay] Merchant validation successful:", {
+        merchantIdentifier: result.merchantIdentifier,
+        domainName: result.domainName,
+        displayName: result.displayName
+      });
+
       ctx.body = { data: result };
     } catch (error) {
       strapi.log.error("[Apple Pay] Controller error:", {
         message: error.message,
         stack: error.stack,
-        name: error.name
+        name: error.name,
+        requestBody: ctx.request.body
       });
 
       ctx.status = error.status || 500;
       ctx.body = {
         error: {
+          status: error.status || 500,
+          name: error.name || "Error",
           message: error.message || "Apple Pay merchant validation failed",
-          details: "Please check your Payone Apple Pay configuration in PMI (CONFIGURATION → PAYMENT PORTALS → [Your Portal] → Apple Pay)"
+          details: "Please check your Payone Apple Pay configuration in PMI (CONFIGURATION → PAYMENT PORTALS → [Your Portal] → Apple Pay). Ensure that Merchant ID (mid) is correctly configured and Apple Pay is enabled for your portal."
         }
       };
     }
