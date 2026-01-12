@@ -33,51 +33,47 @@ const ApplePayBtn = ({
             },
           }
         );
+        console.log(merchantSession, "merchant session");
+        // if (merchantSession.error) {
+        //   const errorMessage =
+        //     merchantSession.error.message || "Merchant validation failed";
+        //   const errorDetails = merchantSession.error.details || "";
 
-        if (merchantSession.error) {
-          const errorMessage =
-            merchantSession.error.message || "Merchant validation failed";
-          const errorDetails = merchantSession.error.details || "";
+        //   if (merchantSession.error.status === 403) {
+        //     throw new Error(
+        //       `403 Forbidden: Authentication failed with Payone. ` +
+        //         `Please check your Payone credentials (aid, portalid, mid, key) in plugin settings. ` +
+        //         `Also ensure that: 1) Mode is set to "live" (Apple Pay only works in live mode), ` +
+        //         `2) Your domain is registered with Payone Merchant Services, ` +
+        //         `3) Merchant ID (mid) matches your merchantIdentifier in PMI. ` +
+        //         `Details: ${errorDetails || errorMessage}`
+        //     );
+        //   }
 
-          // If it's a 403 error, provide more specific guidance
-          if (merchantSession.error.status === 403) {
-            throw new Error(
-              `403 Forbidden: Authentication failed with Payone. ` +
-                `Please check your Payone credentials (aid, portalid, mid, key) in plugin settings. ` +
-                `Also ensure that: 1) Mode is set to "live" (Apple Pay only works in live mode), ` +
-                `2) Your domain is registered with Payone Merchant Services, ` +
-                `3) Merchant ID (mid) matches your merchantIdentifier in PMI. ` +
-                `Details: ${errorDetails || errorMessage}`
-            );
-          }
+        //   throw new Error(
+        //     errorMessage + (errorDetails ? ` - ${errorDetails}` : "")
+        //   );
+        // }
 
-          throw new Error(
-            errorMessage + (errorDetails ? ` - ${errorDetails}` : "")
-          );
-        }
+        // const sessionData = merchantSession.data || merchantSession;
 
-        const sessionData = merchantSession.data || merchantSession;
+        // if (!sessionData || !sessionData.merchantIdentifier) {
+        //   throw new Error(
+        //     "Invalid merchant session: missing merchantIdentifier. " +
+        //       "Please check your Payone Apple Pay configuration in PMI (CONFIGURATION → PAYMENT PORTALS → [Your Portal] → Payment type configuration tab)."
+        //   );
+        // }
 
-        if (!sessionData || !sessionData.merchantIdentifier) {
-          throw new Error(
-            "Invalid merchant session: missing merchantIdentifier. " +
-              "Please check your Payone Apple Pay configuration in PMI (CONFIGURATION → PAYMENT PORTALS → [Your Portal] → Payment type configuration tab)."
-          );
-        }
-
-        session.completeMerchantValidation(sessionData);
+        session.completeMerchantValidation(merchantSession);
       } catch (error) {
-        // Don't call completeMerchantValidation with empty object - this causes user cancellation
-        // Instead, let the error propagate so user can see what went wrong
         if (onError) {
           onError(error);
         }
 
-        // Complete with failure status to show error to user
         try {
           session.completeMerchantValidation({});
         } catch (completeError) {
-          // Silent fail
+          console.error(completeError);
         }
       }
     };
