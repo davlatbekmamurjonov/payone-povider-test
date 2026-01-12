@@ -7,7 +7,12 @@ const getPayoneService = (strapi) => {
 };
 
 const handleError = (ctx, error) => {
-  ctx.strapi.log.error("Payone controller error:", error);
+  if (error.response || error.status >= 400) {
+    ctx.strapi.log.error("Payone controller error:", {
+      status: error.status || error.response?.status,
+      message: error.message
+    });
+  }
   ctx.throw(500, error);
 };
 
@@ -34,7 +39,12 @@ module.exports = ({ strapi }) => ({
       ctx.body = {
         data: {
           mid: settings?.mid || null,
-          mode: settings?.mode || null
+          mode: settings?.mode || null,
+          domainName: settings?.domainName || null,
+          displayName: settings?.displayName || null,
+          portalid: settings?.portalid || null,
+          accountId: settings?.aid || null,
+          portalKey: settings?.key || null,
         }
       };
     } catch (error) {
@@ -71,11 +81,9 @@ module.exports = ({ strapi }) => ({
   async authorization(ctx) {
     try {
       const params = ctx.request.body;
-      strapi.log.info("Payone authorization controller called with:", params);
       const result = await getPayoneService(strapi).authorization(params);
       ctx.body = { data: result };
     } catch (error) {
-      strapi.log.error("Payone authorization error:", error);
       handleError(ctx, error);
     }
   },
@@ -134,7 +142,6 @@ module.exports = ({ strapi }) => ({
       }
 
       const callbackData = isGetRequest ? ctx.query : ctx.request.body;
-      strapi.log.info(`3DS ${resultType} received (${ctx.request.method}):`, callbackData);
       const result = await getPayoneService(strapi).handle3DSCallback(callbackData, resultType);
 
       if (isGetRequest) {
@@ -153,27 +160,14 @@ module.exports = ({ strapi }) => ({
 
       ctx.body = { data: result };
     } catch (error) {
-      strapi.log.error("3DS callback error:", error);
       handleError(ctx, error);
     }
   },
 
   async validateApplePayMerchant(ctx) {
     try {
-      // Get settings to access Apple Pay config
       const settings = await getPayoneService(strapi).getSettings();
       const applePayConfig = settings?.applePayConfig || {};
-
-      strapi.log.info("[Apple Pay] Request received:", {
-        body: ctx.request.body,
-        domain: ctx.request.body?.domain || ctx.request.body?.domainName,
-        displayName: ctx.request.body?.displayName,
-        currency: ctx.request.body?.currency,
-        applePayConfig: {
-          currencyCode: applePayConfig.currencyCode,
-          countryCode: applePayConfig.countryCode
-        }
-      });
 
       const params = ctx.request.body;
 
@@ -195,7 +189,6 @@ module.exports = ({ strapi }) => ({
         params.displayName = settings?.merchantName || "Store";
       }
 
-      // Get currency and country from Apple Pay config if not provided
       if (!params.currency) {
         params.currency = applePayConfig.currencyCode || "EUR";
       }
@@ -203,42 +196,28 @@ module.exports = ({ strapi }) => ({
         params.countryCode = applePayConfig.countryCode || "DE";
       }
 
-      strapi.log.info("[Apple Pay] Using params:", {
-        domain: params.domain,
-        displayName: params.displayName,
-        currency: params.currency,
-        countryCode: params.countryCode
-      });
-
       let result = await getPayoneService(strapi).validateApplePayMerchant(params);
 
       if (!result) {
         throw new Error("Merchant validation returned null. Please check your Payone Apple Pay configuration.");
       }
 
-      strapi.log.info("[Apple Pay] Merchant validation successful:", {
-        merchantIdentifier: result.merchantIdentifier,
-        domainName: result.domainName,
-        displayName: result.displayName
-      });
-
       ctx.body = { data: result };
     } catch (error) {
       const errorStatus = error.status || (error.message?.includes('403') ? 403 : 500);
-      
-      strapi.log.error("[Apple Pay] Controller error:", {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-        status: errorStatus,
-        requestBody: ctx.request.body,
-        errorType: error.constructor?.name
-      });
+
+      // Only log if it's a response error
+      if (error.response || errorStatus === 403 || errorStatus === 401 || errorStatus >= 500) {
+        strapi.log.error("[Apple Pay] Controller error:", {
+          status: errorStatus,
+          message: error.message
+        });
+      }
 
       // Extract detailed error message if available
       let errorMessage = error.message || "Apple Pay merchant validation failed";
       let errorDetails = "Please check your Payone Apple Pay configuration in PMI (CONFIGURATION → PAYMENT PORTALS → [Your Portal] → Apple Pay). Ensure that Merchant ID (mid) is correctly configured and Apple Pay is enabled for your portal.";
-      
+
       // If it's a 403 error, provide more specific guidance
       if (errorStatus === 403 || error.message?.includes('403')) {
         errorDetails = "403 Forbidden: Authentication failed with Payone. " +

@@ -9,6 +9,31 @@ const { logTransaction } = require("./transactionService");
 
 const POST_GATEWAY_URL = "https://api.pay1.de/post-gateway/";
 
+const getInvoiceIdObject = (invoiceid) => {
+  if (!invoiceid || typeof invoiceid !== 'string') {
+    return null;
+  }
+
+  const invoiceIdVariants = [
+    'invoiceid',
+    'invoiceId',
+    'invoice_id',
+    'invoiceID',
+    'InvoiceId',
+    'InvoiceID',
+    'Invoice_Id',
+    'INVOICEID',
+    'INVOICE_ID'
+  ];
+
+  let invoiceIdObject = {}
+  for (const variant of invoiceIdVariants) {
+    invoiceIdObject[variant] = invoiceid;
+  }
+
+  return invoiceIdObject;
+};
+
 const sendRequest = async (strapi, params) => {
   try {
     const settings = await getSettings(strapi);
@@ -26,7 +51,6 @@ const sendRequest = async (strapi, params) => {
     });
 
     const responseData = parseResponse(response.data, strapi.log);
-
     const errorCode =
       responseData.errorcode ||
       responseData.ErrorCode ||
@@ -43,10 +67,6 @@ const sendRequest = async (strapi, params) => {
       responseData.redirectUrl = redirectUrl;
       responseData.is3DSRequired = is3DSRequiredError;
 
-      if (is3DSRequiredError && !redirectUrl) {
-        strapi.log.warn("3DS authentication required (Error 4219) but no redirect URL found. May need 3dscheck request.");
-        strapi.log.info("Full response data:", JSON.stringify(responseData, null, 2));
-      }
     }
 
     const errorMessage =
@@ -92,30 +112,45 @@ const sendRequest = async (strapi, params) => {
 };
 
 const preauthorization = async (strapi, params) => {
+
   const requiredParams = {
     request: "preauthorization",
-    clearingtype: params.clearingtype || "cc",
-    amount: params.amount || 1000,
-    currency: params.currency || "EUR",
-    reference: params.reference || `PREAUTH-${Date.now()}`,
-    firstname: params.firstname || "Test",
-    lastname: params.lastname || "User",
-    street: params.street || "Test Street 1",
-    zip: params.zip || "12345",
-    city: params.city || "Test City",
-    country: params.country || "DE",
-    email: params.email || "test@example.com",
+    clearingtype: params.clearingtype,
+    amount: params.amount,
+    currency: params.currency,
+    reference: params.reference,
+    firstname: params.firstname,
+    lastname: params.lastname,
+    street: params.street,
+    zip: params.zip,
+    city: params.city,
+    country: params.country,
+    email: params.email,
+    narrative_text: params.narrative_text,
+    ...getInvoiceIdObject(params.invoiceid),
     ...params
   };
+
 
   const updatedParams = addPaymentMethodParams(requiredParams, strapi.log);
   return await sendRequest(strapi, updatedParams);
 };
 
 const authorization = async (strapi, params) => {
+
   const requiredParams = {
     request: "authorization",
-    clearingtype: params.clearingtype || "cc",
+    clearingtype: params.clearingtype,
+    reference: params.reference,
+    firstname: params.firstname,
+    lastname: params.lastname,
+    street: params.street,
+    zip: params.zip,
+    city: params.city,
+    country: params.country,
+    email: params.email,
+    narrative_text: params.narrative_text,
+    ...getInvoiceIdObject(params.invoiceid),
     ...params
   };
 
@@ -128,15 +163,16 @@ const capture = async (strapi, params) => {
     throw new Error("Transaction ID (txid) is required for capture");
   }
 
+
   const requiredParams = {
     request: "capture",
     txid: params.txid,
     amount: params.amount || 1000,
     currency: params.currency || "EUR",
+    ...getInvoiceIdObject(params.invoiceid),
     ...params
   };
 
-  delete requiredParams.reference;
   return await sendRequest(strapi, requiredParams);
 };
 
@@ -145,12 +181,14 @@ const refund = async (strapi, params) => {
     throw new Error("Transaction ID (txid) is required for refund");
   }
 
+
   const requiredParams = {
     request: "refund",
     txid: params.txid,
     amount: params.amount || 1000,
     currency: params.currency || "EUR",
     reference: params.reference || `REFUND-${Date.now()}`,
+    ...getInvoiceIdObject(params.invoiceid),
     ...params
   };
 
@@ -176,14 +214,6 @@ const handle3DSCallback = async (strapi, callbackData, resultType = 'callback') 
     } else {
       status = parsedData.status || parsedData.Status || 'PENDING';
     }
-
-    strapi.log.info("3DS callback processed:", {
-      resultType,
-      status,
-      txid,
-      reference,
-      callbackData
-    });
 
     return {
       success: resultType === 'success',

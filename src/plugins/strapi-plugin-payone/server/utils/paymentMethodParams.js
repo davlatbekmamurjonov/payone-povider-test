@@ -1,15 +1,72 @@
 "use strict";
 
 
+function getValidCardExpiryDate(cardexpiredate) {
+  const now = new Date();
+  const currentYear = now.getFullYear() % 100;
+  const currentMonth = now.getMonth() + 1;
+
+  if (!cardexpiredate || cardexpiredate.trim() === "") {
+    const nextYear = currentYear + 1;
+    const monthStr = String(currentMonth).padStart(2, '0');
+    return `${nextYear}${monthStr}`;
+  }
+
+  if (!/^\d{4}$/.test(cardexpiredate)) {
+    const nextYear = currentYear + 1;
+    const monthStr = String(currentMonth).padStart(2, '0');
+    return `${nextYear}${monthStr}`;
+  }
+
+  const year = parseInt(cardexpiredate.substring(0, 2), 10);
+  const month = parseInt(cardexpiredate.substring(2, 4), 10);
+
+  if (month < 1 || month > 12) {
+    const nextYear = currentYear + 1;
+    const monthStr = String(currentMonth).padStart(2, '0');
+    return `${nextYear}${monthStr}`;
+  }
+
+  const currentDate = new Date(2000 + currentYear, currentMonth - 1);
+  const expiryDate = new Date(2000 + year, month - 1);
+
+  if (expiryDate < currentDate) {
+    const nextYear = currentYear + 1;
+    const monthStr = String(currentMonth).padStart(2, '0');
+    return `${nextYear}${monthStr}`;
+  }
+
+  return cardexpiredate;
+}
+
 const addPaymentMethodParams = (params, logger) => {
   const updated = { ...params };
   const clearingtype = updated.clearingtype || "cc";
 
-  // Payment method specific defaults
+  const customParams = {};
+  const knownParams = new Set([
+    'cardpan', 'cardexpiredate', 'cardcvc2', 'cardtype', 'wallettype',
+    'bankcountry', 'iban', 'bic', 'bankaccountholder', 'onlinebanktransfertype',
+    'recurrence', 'financingtype', 'invoicetype',
+    // Common defaults
+    'salutation', 'gender', 'telephonenumber', 'ip', 'language', 'customer_is_present',
+    // Payment method tokens
+    'applePayToken', 'googlePayToken',
+    // Other known params
+    'clearingtype', 'paymentMethod', 'settings', 'enable3DSecure', 'ecommercemode'
+  ]);
+
+  // Extract custom params that are not in known params
+  Object.keys(updated).forEach(key => {
+    if (!knownParams.has(key) && !key.startsWith('add_paydata[')) {
+      customParams[key] = updated[key];
+    }
+  });
+
   const methodDefaults = {
     cc: {
       cardpan: "4111111111111111",
-      cardexpiredate: "2512",
+      cardexpiredate: getValidCardExpiryDate(null),
       cardcvc2: "123",
       cardtype: "V"
     },
@@ -72,7 +129,13 @@ const addPaymentMethodParams = (params, logger) => {
     if (key === "wallettype" && updated.wallettype) {
       return;
     }
-    if (!updated[key]) {
+    if (key === "cardexpiredate") {
+      if (!updated[key] || updated[key].trim() === "") {
+        updated[key] = getValidCardExpiryDate(null);
+      } else {
+        updated[key] = getValidCardExpiryDate(updated[key]);
+      }
+    } else if (!updated[key]) {
       updated[key] = value;
     }
   });
@@ -80,7 +143,6 @@ const addPaymentMethodParams = (params, logger) => {
   if (updated.applePayToken) {
     let tokenData;
     try {
-      // Decode Base64 token
       const tokenString = Buffer.from(updated.applePayToken, 'base64').toString('utf-8');
       tokenData = JSON.parse(tokenString);
     } catch (e) {
@@ -166,6 +228,8 @@ const addPaymentMethodParams = (params, logger) => {
       updated[key] = value;
     }
   });
+
+  Object.assign(updated, customParams);
 
   return updated;
 };

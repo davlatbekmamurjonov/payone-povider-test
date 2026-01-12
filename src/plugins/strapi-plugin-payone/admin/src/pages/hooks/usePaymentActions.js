@@ -6,7 +6,8 @@ import {
   getAuthorizationParams,
   getCaptureParams,
   getRefundParams,
-  generateLagOrderNumber
+  generateLagOrderNumber,
+  getValidCardExpiryDate,
 } from "../utils/paymentUtils";
 import { DEFAULT_PAYMENT_DATA } from "../constants/paymentConstants";
 
@@ -75,11 +76,6 @@ const usePaymentActions = () => {
   };
 
   const handlePreauthorization = async (tokenParam = null) => {
-    console.log("[Payment] handlePreauthorization called", {
-      hasToken: !!tokenParam,
-      paymentMethod,
-      amount: paymentAmount
-    });
     setIsProcessingPayment(true);
     setPaymentError(null);
     setPaymentResult(null);
@@ -96,13 +92,15 @@ const usePaymentActions = () => {
         currency: currency,
         reference: finalPreauthReference,
         enable3DSecure: settings.enable3DSecure !== false,
+        invoiceid: finalPreauthReference,
+        narrative_text: "Preauthorization for order " + finalPreauthReference,
         ...DEFAULT_PAYMENT_DATA
       };
 
       if (paymentMethod === "cc" && settings.enable3DSecure !== false) {
         if (cardtype) baseParams.cardtype = cardtype;
         if (cardpan) baseParams.cardpan = cardpan;
-        if (cardexpiredate) baseParams.cardexpiredate = cardexpiredate;
+        baseParams.cardexpiredate = getValidCardExpiryDate(cardexpiredate);
         if (cardcvc2) baseParams.cardcvc2 = cardcvc2;
       }
 
@@ -152,8 +150,6 @@ const usePaymentActions = () => {
         null;
 
       if (is3DSRequiredError && !redirectUrl) {
-        console.warn("3DS authentication required (Error 4219) but no redirect URL found in response");
-        console.log("Full response:", JSON.stringify(responseData, null, 2));
         setPaymentError(
           "3D Secure authentication required. Please check Payone configuration and ensure redirect URLs are properly set. Error: " +
           (errorMessage || `Error code: ${errorCode}`)
@@ -177,7 +173,6 @@ const usePaymentActions = () => {
         (is3DSRequiredError && redirectUrl);
 
       if (needsRedirect && redirectUrl) {
-        console.log("Redirecting to 3DS:", redirectUrl);
         window.location.href = redirectUrl;
         return;
       }
@@ -222,13 +217,15 @@ const usePaymentActions = () => {
         currency: currency,
         reference: finalAuthReference,
         enable3DSecure: settings.enable3DSecure !== false,
+        invoiceid: finalAuthReference,
+        narrative_text: "Authorization for order " + finalAuthReference,
         ...DEFAULT_PAYMENT_DATA
       };
 
       if (paymentMethod === "cc" && settings.enable3DSecure !== false) {
         if (cardtype) baseParams.cardtype = cardtype;
         if (cardpan) baseParams.cardpan = cardpan;
-        if (cardexpiredate) baseParams.cardexpiredate = cardexpiredate;
+        baseParams.cardexpiredate = getValidCardExpiryDate(cardexpiredate);
         if (cardcvc2) baseParams.cardcvc2 = cardcvc2;
       }
 
@@ -278,8 +275,6 @@ const usePaymentActions = () => {
         null;
 
       if (is3DSRequiredError && !redirectUrl) {
-        console.warn("3DS authentication required (Error 4219) but no redirect URL found in response");
-        console.log("Full response:", JSON.stringify(responseData, null, 2));
         setPaymentError(
           "3D Secure authentication required. Please check Payone configuration and ensure redirect URLs are properly set. Error: " +
           (errorMessage || `Error code: ${errorCode}`)
@@ -303,7 +298,6 @@ const usePaymentActions = () => {
         (is3DSRequiredError && redirectUrl);
 
       if (needsRedirect && redirectUrl) {
-        console.log("Redirecting to 3DS:", redirectUrl);
         window.location.href = redirectUrl;
         return;
       }

@@ -71,7 +71,6 @@ module.exports = async ({ strapi }) => {
           if (fs.existsSync(filePath)) {
             filePathFound = filePath;
             fileContent = fs.readFileSync(filePath, 'utf8');
-            strapi.log.info(`[Apple Pay] Found domain verification file at: ${filePathFound}`);
             break;
           }
         }
@@ -81,18 +80,12 @@ module.exports = async ({ strapi }) => {
           ctx.set('Content-Type', 'text/plain');
           ctx.set('Cache-Control', 'public, max-age=31536000');
           ctx.body = fileContent.trim();
-          strapi.log.info(`[Apple Pay] Successfully served domain verification file from: ${filePathFound}`);
         } else {
-          strapi.log.warn(`[Apple Pay] Domain verification file not found. Searched paths:`, possiblePaths);
           ctx.status = 404;
           ctx.type = 'text/plain';
           ctx.body = 'File not found';
         }
       } catch (error) {
-        strapi.log.error("[Apple Pay] Error serving domain verification file:", {
-          message: error.message,
-          stack: error.stack
-        });
         ctx.status = 500;
         ctx.type = 'text/plain';
         ctx.body = 'Internal server error';
@@ -104,6 +97,6 @@ module.exports = async ({ strapi }) => {
       strapi.server.app.use(router.allowedMethods());
     }
   } catch (error) {
-    strapi.log.warn('Could not register 3DS callback routes:', error.message);
+    // Silent fail
   }
 };
