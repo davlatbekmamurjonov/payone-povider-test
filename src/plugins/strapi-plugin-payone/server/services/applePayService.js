@@ -8,13 +8,35 @@ const POST_GATEWAY_URL = "https://api.pay1.de/post-gateway/";
 
 const parseResponse = (responseData) => {
   if (typeof responseData === 'string') {
+    if (responseData.trim().startsWith('{')) {
+      try {
+        return JSON.parse(responseData);
+      } catch (e) {
+        // Fall through to URL-encoded parsing
+      }
+    }
+
     const params = new URLSearchParams(responseData);
     const parsed = {};
     for (const [key, value] of params.entries()) {
       parsed[key] = value;
+      const normalizedKey = key.toLowerCase().replace(/\[/g, '_').replace(/\]/g, '');
+      if (normalizedKey !== key.toLowerCase()) {
+        parsed[normalizedKey] = value;
+      }
     }
     return parsed;
   }
+
+  if (typeof responseData === 'object' && responseData !== null) {
+    const result = { ...responseData };
+    if (result['add_paydata[applepay_payment_session]']) {
+      result.add_paydata = result.add_paydata || {};
+      result.add_paydata.applepay_payment_session = result['add_paydata[applepay_payment_session]'];
+    }
+    return result;
+  }
+
   return responseData;
 };
 
@@ -70,139 +92,69 @@ const initializeApplePaySession = async (strapi, params) => {
       }
     });
 
-    console.log(response, 'init apple pay session response');
+
+    if (response.status === 403) {
+      const responseData = parseResponse(response.data);
+      const errorCode = responseData.errorcode || responseData.ErrorCode;
+      const errorMessage = responseData.errormessage || responseData.ErrorMessage || responseData.customermessage || responseData.CustomerMessage;
+
+      strapi.log.error("[Apple Pay] 403 Forbidden from Payone:", {
+        errorcode: errorCode,
+        errormessage: errorMessage
+      });
+
+      const detailedError = new Error("403 Forbidden: Authentication failed with Payone API. " +
+        (errorCode ? `Error Code: ${errorCode}. ` : "") +
+        (errorMessage ? `Error: ${errorMessage}. ` : ""));
+      Object.assign(detailedError, { status: 403, response: response });
+      throw detailedError;
+    }
+
+    if (response.status >= 400 && response.status < 500) {
+      const responseData = parseResponse(response.data);
+      const errorCode = responseData.errorcode || responseData.ErrorCode;
+      const errorMessage = responseData.errormessage || responseData.ErrorMessage || responseData.customermessage || responseData.CustomerMessage;
+
+      strapi.log.error("[Apple Pay] Client error from Payone:", {
+        status: response.status,
+        errorcode: errorCode,
+        errormessage: errorMessage
+      });
+
+      const detailedError = new Error(`Payone API error (${response.status}): ${errorMessage || 'Unknown error'}`);
+      Object.assign(detailedError, { status: response.status, response: response });
+      throw detailedError;
+    }
+
+    if (response.status >= 500) {
+      strapi.log.error("[Apple Pay] Server error from Payone:", {
+        status: response.status,
+        statusText: response.statusText,
+        data: response.data
+      });
+
+      const detailedError = new Error(`Payone server error (${response.status}): ${response.statusText || 'Internal server error'}`);
+      Object.assign(detailedError, { status: response.status, response: response });
+      throw detailedError;
+    }
 
     const responseData = parseResponse(response.data);
 
-
-    // if (response.status === 403) {
-    //   const responseData = parseResponse(response.data);
-    //   const errorCode = responseData.errorcode || responseData.ErrorCode;
-    //   const errorMessage = responseData.errormessage || responseData.ErrorMessage || responseData.customermessage || responseData.CustomerMessage;
-
-    //   strapi.log.error("[Apple Pay] 403 Forbidden from Payone:", {
-    //     errorcode: errorCode,
-    //     errormessage: errorMessage
-    //   });
-
-    //   const detailedError = new Error("403 Forbidden: Authentication failed with Payone API. " +
-    //     (errorCode ? `Error Code: ${errorCode}. ` : "") +
-    //     (errorMessage ? `Error: ${errorMessage}. ` : "") +
-    //     "Please check: 1) Your Payone credentials (aid, portalid, mid, key) in plugin settings, " +
-    //     "2) Mode is set to 'live' (Apple Pay only works in live mode), " +
-    //     "3) Your domain is registered with Payone Merchant Services, " +
-    //     "4) Merchant ID (mid) matches your merchantIdentifier in PMI, " +
-    //     "5) Apple Pay is enabled for your portal in PMI.");
-    //   Object.assign(detailedError, { status: 403, response: response });
-    //   throw detailedError;
-    // }
-
-    // if (response.status >= 400 && response.status < 500) {
-    //   const responseData = parseResponse(response.data);
-    //   const errorCode = responseData.errorcode || responseData.ErrorCode;
-    //   const errorMessage = responseData.errormessage || responseData.ErrorMessage || responseData.customermessage || responseData.CustomerMessage;
-
-    //   strapi.log.error("[Apple Pay] Client error from Payone:", {
-    //     status: response.status,
-    //     errorcode: errorCode,
-    //     errormessage: errorMessage
-    //   });
-
-    //   const detailedError = new Error(`Payone API error (${response.status}): ${errorMessage || 'Unknown error'}`);
-    //   Object.assign(detailedError, { status: response.status, response: response });
-    //   throw detailedError;
-    // }
-
-    // if (response.status >= 500) {
-    //   strapi.log.error("[Apple Pay] Server error from Payone:", {
-    //     status: response.status,
-    //     statusText: response.statusText,
-    //     data: response.data
-    //   });
-
-    //   const detailedError = new Error(`Payone server error (${response.status}): ${response.statusText || 'Internal server error'}`);
-    //   Object.assign(detailedError, { status: response.status, response: response });
-    //   throw detailedError;
-    // }
-
-    // const responseData = parseResponse(response.data);
-
-    // if (responseData.errorcode || responseData.ErrorCode) {
-    //   strapi.log.error("[Apple Pay] Payone error:", {
-    //     errorcode: responseData.errorcode || responseData.ErrorCode,
-    //     errormessage: responseData.errormessage || responseData.ErrorMessage,
-    //     customermessage: responseData.customermessage || responseData.CustomerMessage
-    //   });
-    // }
+    if (responseData.errorcode || responseData.ErrorCode) {
+      strapi.log.error("[Apple Pay] Payone error:", {
+        errorcode: responseData.errorcode || responseData.ErrorCode,
+        errormessage: responseData.errormessage || responseData.ErrorMessage,
+        customermessage: responseData.customermessage || responseData.CustomerMessage
+      });
+    }
 
     return responseData;
   } catch (error) {
-    const errorStatus = error.response?.status || error.status;
-    // const errorResponseData = error.response?.data;
-    // if (errorStatus === 403 || error.message?.includes('403')) {
-    //   let responseData = {};
-    //   let errorCode = null;
-    //   let errorMessage = null;
-
-    //   if (errorResponseData) {
-    //     try {
-    //       responseData = parseResponse(errorResponseData);
-    //       errorCode = responseData.errorcode || responseData.ErrorCode;
-    //       errorMessage = responseData.errormessage || responseData.ErrorMessage || responseData.customermessage || responseData.CustomerMessage;
-    //     } catch (parseErr) {
-    //       if (typeof errorResponseData === 'string') {
-    //         errorMessage = errorResponseData;
-    //       }
-    //     }
-    //   }
-
-    //   if (errorCode || errorMessage) {
-    //     strapi.log.error("[Apple Pay] 403 Forbidden from Payone:", {
-    //       errorcode: errorCode,
-    //       errormessage: errorMessage
-    //     });
-    //   }
-
-    //   let detailedMessage = "403 Forbidden: Authentication failed with Payone API. ";
-
-    //   if (errorCode) {
-    //     detailedMessage += `Error Code: ${errorCode}. `;
-    //   }
-
-    //   if (errorMessage) {
-    //     detailedMessage += `Error: ${errorMessage}. `;
-    //   }
-
-    //   detailedMessage += "Please check:\n" +
-    //     "1. Your Payone credentials (aid, portalid, mid, key) in plugin settings\n" +
-    //     "2. Mode is set to 'live' (Apple Pay only works in live mode according to Payone docs)\n" +
-    //     "3. Your domain is registered with Payone Merchant Services\n" +
-    //     "4. Merchant ID (mid) matches your merchantIdentifier in PMI\n" +
-    //     "5. Apple Pay is enabled for your portal in PMI (CONFIGURATION → PAYMENT PORTALS → [Your Portal] → Payment type configuration tab)";
-
-    //   throw new Error(detailedMessage);
-    // } else if (errorStatus === 401 || error.message?.includes('401')) {
-    //   if (errorResponseData) {
-    //     const responseData = parseResponse(errorResponseData);
-    //     strapi.log.error("[Apple Pay] 401 Unauthorized from Payone:", {
-    //       errorcode: responseData.errorcode || responseData.ErrorCode,
-    //       errormessage: responseData.errormessage || responseData.ErrorMessage
-    //     });
-    //   }
-    //   throw new Error("401 Unauthorized: Invalid credentials. Please verify your Payone key in plugin settings.");
-    // } else if (errorStatus && errorStatus >= 500) {
-    //   const responseData = errorResponseData ? parseResponse(errorResponseData) : {};
-    //   strapi.log.error("[Apple Pay] Payone server error:", {
-    //     status: error.response?.status,
-    //     errorcode: responseData.errorcode || responseData.ErrorCode,
-    //     errormessage: responseData.errormessage || responseData.ErrorMessage
-    //   });
-    //   throw new Error(`Payone server error (${error.response?.status}): ${error.response?.statusText || 'Internal server error'}`);
-    // }
-
-    console.log(error, 'apple pay init session error')
+    strapi.log.error("[Apple Pay] Error:", error instanceof Error ? error.message : error);
+    throw error;
   }
 };
+
 
 const validateApplePayMerchant = async (strapi, params) => {
   try {
@@ -224,56 +176,117 @@ const validateApplePayMerchant = async (strapi, params) => {
 
     const sessionResponse = await initializeApplePaySession(strapi, params);
 
-    strapi.log.info(sessionResponse, 'validate apple pay merchant response');
+    // Extract add_paydata[applepay_payment_session] from response
+    // Payone returns this in URL-encoded format: add_paydata[applepay_payment_session]=BASE64_STRING
+    const applePaySessionBase64 =
+      sessionResponse["add_paydata[applepay_payment_session]"] ||
+      sessionResponse["add_paydata_applepay_payment_session"] ||
+      sessionResponse.add_paydata?.applepay_payment_session ||
+      (sessionResponse.add_paydata && typeof sessionResponse.add_paydata === 'object'
+        ? sessionResponse.add_paydata["applepay_payment_session"]
+        : null);
 
-    // const applePaySessionBase64 = sessionResponse["add_paydata[applepay_payment_session]"] ||
-    //   sessionResponse.add_paydata?.applepay_payment_session;
+    strapi.log.info("[Apple Pay] Genericpayment response:", {
+      status: sessionResponse.status,
+      workorderid: sessionResponse.workorderid,
+      hasApplePaySession: !!applePaySessionBase64,
+      applePaySessionLength: applePaySessionBase64 ? applePaySessionBase64.length : 0,
+      responseKeys: Object.keys(sessionResponse),
+      hasAddPaydataKey: !!sessionResponse["add_paydata[applepay_payment_session]"],
+      hasAddPaydataObject: !!sessionResponse.add_paydata,
+      addPaydataKeys: sessionResponse.add_paydata ? Object.keys(sessionResponse.add_paydata) : null
+    });
 
-    // if (sessionResponse.status === "OK" && applePaySessionBase64 && applePaySessionBase64.length > 0) {
-    //   try {
-    //     const merchantSessionJson = Buffer.from(applePaySessionBase64, 'base64').toString('utf-8');
-    //     const merchantSession = JSON.parse(merchantSessionJson);
+    if (!applePaySessionBase64) {
+      strapi.log.error("[Apple Pay] Missing applepay_payment_session in response:", {
+        status: sessionResponse.status,
+        responseKeys: Object.keys(sessionResponse),
+        responseSample: JSON.stringify(sessionResponse).substring(0, 1000),
+        addPaydataKeys: sessionResponse.add_paydata ? Object.keys(sessionResponse.add_paydata) : null
+      });
+      throw new Error("Missing applepay_payment_session in Payone response. Please check your Payone Apple Pay configuration in PMI.");
+    }
 
-    //     if (merchantSession.epochTimestamp && merchantSession.epochTimestamp > 1000000000000) {
-    //       merchantSession.epochTimestamp = Math.floor(merchantSession.epochTimestamp / 1000);
-    //     }
+    if (sessionResponse.status === "OK" && applePaySessionBase64 && applePaySessionBase64.length > 0) {
+      try {
+        strapi.log.info("[Apple Pay] Extracting merchant session from Base64:", {
+          base64Length: applePaySessionBase64.length,
+          base64Preview: applePaySessionBase64.substring(0, 100) + "...",
+          base64End: applePaySessionBase64.substring(Math.max(0, applePaySessionBase64.length - 50))
+        });
 
-    //     if (merchantSession.expiresAt && merchantSession.expiresAt > 1000000000000) {
-    //       merchantSession.expiresAt = Math.floor(merchantSession.expiresAt / 1000);
-    //     }
+        // Decode Base64 to get merchant session JSON
+        let merchantSessionJson;
+        try {
+          merchantSessionJson = Buffer.from(applePaySessionBase64, 'base64').toString('utf-8');
+          strapi.log.info("[Apple Pay] Base64 decoded successfully, JSON length:", merchantSessionJson.length);
+        } catch (decodeError) {
+          strapi.log.error("[Apple Pay] Failed to decode Base64:", {
+            error: decodeError.message,
+            base64Length: applePaySessionBase64.length
+          });
+          throw new Error(`Failed to decode Base64 merchant session: ${decodeError.message}`);
+        }
 
-    //     if (!merchantSession.merchantIdentifier ||
-    //       merchantSession.merchantIdentifier === 'undefined' ||
-    //       merchantSession.merchantIdentifier === 'null') {
-    //       merchantSession.merchantIdentifier = settings.mid || settings.merchantIdentifier || settings.portalid;
-    //     }
+        // Parse JSON merchant session
+        let merchantSession;
+        try {
+          merchantSession = JSON.parse(merchantSessionJson);
+          strapi.log.info("[Apple Pay] Merchant session JSON parsed successfully");
+        } catch (parseError) {
+          strapi.log.error("[Apple Pay] Failed to parse merchant session JSON:", {
+            error: parseError.message,
+            jsonPreview: merchantSessionJson.substring(0, 500)
+          });
+          throw new Error(`Failed to parse merchant session JSON: ${parseError.message}`);
+        }
 
-    //     if (!merchantSession.merchantIdentifier) {
-    //       throw new Error("Merchant identifier is missing. Please configure Merchant ID (mid) in plugin settings.");
-    //     }
+        strapi.log.info("[Apple Pay] Merchant session extracted successfully:", {
+          hasMerchantIdentifier: !!merchantSession.merchantIdentifier,
+          hasEpochTimestamp: !!merchantSession.epochTimestamp,
+          hasExpiresAt: !!merchantSession.expiresAt,
+          merchantSessionKeys: Object.keys(merchantSession)
+        });
 
-    //     return merchantSession;
-    //   } catch (parseError) {
-    //     throw new Error(`Failed to parse merchant session from Payone: ${parseError.message}`);
-    //   }
-    // }
+        if (merchantSession.epochTimestamp && merchantSession.epochTimestamp > 1000000000000) {
+          merchantSession.epochTimestamp = Math.floor(merchantSession.epochTimestamp / 1000);
+        }
 
-    // const errorCode = sessionResponse.errorcode || sessionResponse.ErrorCode;
-    // const errorMessage = sessionResponse.errormessage || sessionResponse.ErrorMessage ||
-    //   sessionResponse.errortxt || sessionResponse.ErrorTxt;
+        if (merchantSession.expiresAt && merchantSession.expiresAt > 1000000000000) {
+          merchantSession.expiresAt = Math.floor(merchantSession.expiresAt / 1000);
+        }
 
-    // strapi.log.error("[Apple Pay] Payone Apple Pay initialization failed:", {
-    //   errorcode: errorCode,
-    //   errormessage: errorMessage
-    // });
+        if (!merchantSession.merchantIdentifier ||
+          merchantSession.merchantIdentifier === 'undefined' ||
+          merchantSession.merchantIdentifier === 'null') {
+          merchantSession.merchantIdentifier = settings.mid || settings.merchantIdentifier || settings.portalid;
+        }
 
-    // throw new Error(
-    //   `Payone Apple Pay initialization failed: ${errorCode ? `Error ${errorCode}` : 'Unknown error'} - ${errorMessage || 'Please check your Payone Apple Pay configuration in PMI'}`
-    // );
+        if (!merchantSession.merchantIdentifier) {
+          throw new Error("Merchant identifier is missing. Please configure Merchant ID (mid) in plugin settings.");
+        }
 
+        return merchantSession;
+      } catch (parseError) {
+        throw new Error(`Failed to parse merchant session from Payone: ${parseError.message}`);
+      }
+    }
 
-    return sessionResponse;
+    const errorCode = sessionResponse.errorcode || sessionResponse.ErrorCode;
+    const errorMessage = sessionResponse.errormessage || sessionResponse.ErrorMessage ||
+      sessionResponse.errortxt || sessionResponse.ErrorTxt;
+
+    strapi.log.error("[Apple Pay] Payone Apple Pay initialization failed:", {
+      errorcode: errorCode,
+      errormessage: errorMessage
+    });
+
+    throw new Error(
+      `Payone Apple Pay initialization failed: ${errorCode ? `Error ${errorCode}` : 'Unknown error'} - ${errorMessage || 'Please check your Payone Apple Pay configuration in PMI'}`
+    );
+
   } catch (error) {
+    strapi.log.error("[Apple Pay] Error:", error instanceof Error ? error.message : error);
     throw error;
   }
 };
