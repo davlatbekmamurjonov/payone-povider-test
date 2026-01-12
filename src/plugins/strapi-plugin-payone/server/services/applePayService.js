@@ -61,7 +61,6 @@ const initializeApplePaySession = async (strapi, params) => {
     }
 
     const mode = (settings.mode || "test").toLowerCase();
-
     if (mode !== "live") {
       validationErrors.push(`Mode is set to "${mode}" but Apple Pay only works in "live" mode according to Payone documentation`);
     }
@@ -154,7 +153,6 @@ const initializeApplePaySession = async (strapi, params) => {
     throw error;
   }
 };
-
 
 const validateApplePayMerchant = async (strapi, params) => {
   try {
